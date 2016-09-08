@@ -4,10 +4,6 @@ from homework1 import *
 zero = EInteger(0)
 tt = EBoolean(True)
 ff = EBoolean(False)
-vvec = VVector([VInteger(10), VInteger(20), VInteger(30)])
-evec = EVector([EInteger(10), EInteger(20), EInteger(30)])
-evec_plus = EVector([EPlus(EInteger(1), EInteger(2)), EInteger(0)])
-evec_bool = EVector([EBoolean(True), EAnd(EBoolean(True), EBoolean(False))])
 v1 = EVector([EInteger(2), EInteger(3)])
 v2 = EVector([EInteger(33), EInteger(66)])
 b1 = EVector([EBoolean(True), EBoolean(False)])
@@ -84,6 +80,9 @@ class TestStringMethods (unittest.TestCase):
         # vectors
         self.assertEqual(pair(EPlus(v1, v2).eval()), (35, 69))
 
+        with self.assertRaises(Exception):
+            EPlus(EInteger(1), EBoolean(True)).eval()
+
 
     def test_EMinus (self):
         # integers
@@ -99,6 +98,9 @@ class TestStringMethods (unittest.TestCase):
         # vectors
         self.assertEqual(pair(EMinus(v1, v2).eval()), (-31, -63))
 
+        with self.assertRaises(Exception):
+            EMinus(EInteger(1), EBoolean(True)).eval()
+
 
     def test_ETimes (self):
         self.assertEqual(ETimes(EInteger(1), EInteger(3)).eval().value, 3)
@@ -107,23 +109,29 @@ class TestStringMethods (unittest.TestCase):
         self.assertEqual(ETimes(EInteger(3), ERational(1, 2)).eval().numer, 3)
         self.assertEqual(ETimes(EInteger(3), ERational(1, 2)).eval().denom, 2)
 
+        with self.assertRaises(Exception):
+            ETimes(EInteger(1), EBoolean(True)).eval()
+
 
     def test_EVector (self):
         # empty vector
         self.assertEqual(EVector([]).eval().length, 0)
 
         # vectors of integers
+        evec = EVector([EInteger(10), EInteger(20), EInteger(30)])
         self.assertEqual(evec.eval().length, 3)
         self.assertEqual(evec.eval().get(0).value, 10)
         self.assertEqual(evec.eval().get(1).value, 20)
         self.assertEqual(evec.eval().get(2).value, 30)
 
         # vectors containing integer operations
+        evec_plus = EVector([EPlus(EInteger(1), EInteger(2)), EInteger(0)])
         self.assertEqual(evec_plus.eval().length, 2)
         self.assertEqual(evec_plus.eval().get(0).value, 3)
         self.assertEqual(evec_plus.eval().get(1).value, 0)
 
         # vectors of booleans
+        evec_bool = EVector([EBoolean(True), EAnd(EBoolean(True), EBoolean(False))])
         self.assertEqual(evec_bool.eval().length, 2)
         self.assertEqual(evec_bool.eval().get(0).value, True)
         self.assertEqual(evec_bool.eval().get(1).value, False)
@@ -131,6 +139,8 @@ class TestStringMethods (unittest.TestCase):
 
     def test_VVector (self):
         self.assertEqual(VVector([]).length, 0)
+
+        vvec = VVector([VInteger(10), VInteger(20), VInteger(30)])
         self.assertEqual(vvec.length, 3)
         self.assertEqual(vvec.get(0).value, 10)
         self.assertEqual(vvec.get(1).value, 20)
