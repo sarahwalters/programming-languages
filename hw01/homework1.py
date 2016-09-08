@@ -264,7 +264,7 @@ class EAnd (Exp):
                 return VBoolean(False)
 
         elif v1.type == "vector":
-            v2 = self._exp2.eval()
+            v2 = self._b2.eval()
             if v2.type == "vector":
                 if v1.length != v2.length:
                     raise Exception ("Runtime error: EAnd not supported for vectors of different lengths")
