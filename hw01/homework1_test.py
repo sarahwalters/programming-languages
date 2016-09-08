@@ -7,7 +7,7 @@ ff = EBoolean(False)
 vvec = VVector([VInteger(10), VInteger(20), VInteger(30)])
 evec = EVector([EInteger(10), EInteger(20), EInteger(30)])
 evec_plus = EVector([EPlus(EInteger(1), EInteger(2)), EInteger(0)])
-#evec_bool = EVector([EBoolean(True), EAnd(EBoolean(True), EBoolean(False))])
+evec_bool = EVector([EBoolean(True), EAnd(EBoolean(True), EBoolean(False))])
 v1 = EVector([EInteger(2), EInteger(3)])
 v2 = EVector([EInteger(33), EInteger(66)])
 b1 = EVector([EBoolean(True), EBoolean(False)])
@@ -124,9 +124,9 @@ class TestStringMethods (unittest.TestCase):
         self.assertEqual(evec_plus.eval().get(1).value, 0)
 
         # vectors of booleans
-#       self.assertEqual(evec_bool.eval().length, 2)
-#       self.assertEqual(evec_bool.eval().get(0).value, True)
-#       self.assertEqual(evec_bool.eval().get(1).value, False)
+        self.assertEqual(evec_bool.eval().length, 2)
+        self.assertEqual(evec_bool.eval().get(0).value, True)
+        self.assertEqual(evec_bool.eval().get(1).value, False)
 
 
     def test_VVector (self):
