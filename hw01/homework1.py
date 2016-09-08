@@ -74,30 +74,7 @@ class EIsZero (Exp):
         if v.type == "integer":
             return VBoolean(v.value == 0)
 
-        raise Exception ("Runtime error: trying to check zero of non-number")
-
-
-class EAnd (Exp):
-    # Boolean literal
-
-    def __init__ (self, b1, b2):
-        self._b1 = b1
-        self._b2 = b2
-
-    def __str__ (self):
-        return "EAnd({})".format(self._b1, self._b2)
-
-    def eval (self):
-        v1 = self._b1.eval()
-        if v1.type == "boolean":
-            if (v1.value):
-                v2 = self._b2.eval()
-                if (v2.type == "boolean"):
-                    return VBoolean(v2.value)
-            else:
-                return VBoolean(False)
-
-        raise Exception ("Runtime error: trying to check zero of non boolean expressions")
+        raise Exception ("Runtime error: EZero not supported for {}".format(v.type))
 
 
 class EPlus (Exp):
@@ -188,7 +165,6 @@ class ETimes (Exp):
         v1 = self._exp1.eval()
         v2 = self._exp2.eval()
 
-<<<<<<< HEAD
         if v1.type == "integer":
             if v2.type == "integer":
                 return VInteger(v1.value * v2.value)
@@ -201,12 +177,7 @@ class ETimes (Exp):
             elif v2.type == "rational":
                 return VRational(v1.numer * v2.numer, v1.denom * v2.denom)
 
-        raise Exception ("Runtime error: trying to multiply non-numbers")
-=======
-        if v1.type == "integer" and v2.type == "integer":
-            return VInteger(v1.value * v2.value)
-
-        if v1.type == "vector" and v2.type == "vector":
+        elif v1.type == "vector" and v2.type == "vector":
             if v1.length != v2.length: 
                 raise Exception ("Runtime error: ETimes not supported for vectors of different lengths")  
             innerProduct = 0
@@ -215,10 +186,9 @@ class ETimes (Exp):
                     innerProduct += v1.get(i).value * v2.get(i).value
                 else:
                     raise Exception ("Runtime error: ETimes not supported for vectors of non-numbers")
-            return VInteger()
+            return VInteger(innerProduct)
 
         raise Exception ("Runtime error: ETimes not supported for {} and {}".format(v1.type, v2.type))
->>>>>>> 3050989... Cleaning up before merging
 
 
 class EDiv (Exp):
@@ -247,7 +217,7 @@ class EDiv (Exp):
             elif v2.type == "rational":
                 return VRational(v1.numer*v2.denom, v1.denom*v2.numer)
 
-        raise Exception ("Runtime error: trying to divide non-numbers")
+        raise Exception ("Runtime error: EDiv not supported for {} and {}".format(v1.type, v2.type))
 
 
 class EIf (Exp):
@@ -270,6 +240,43 @@ class EIf (Exp):
             return self._then.eval()
         else:
             return self._else.eval()
+
+
+class EAnd (Exp):
+    # Boolean literal
+
+    def __init__ (self, b1, b2):
+        self._b1 = b1
+        self._b2 = b2
+
+    def __str__ (self):
+        return "EAnd({})".format(self._b1, self._b2)
+
+    def eval (self):
+        v1 = self._b1.eval()
+
+        if v1.type == "boolean":
+            if v1.value:
+                v2 = self._b2.eval()
+                if v2.type == "boolean":
+                    return VBoolean(v2.value)
+            else:
+                return VBoolean(False)
+
+        elif v1.type == "vector":
+            v2 = self._exp2.eval()
+            if v2.type == "vector":
+                if v1.length != v2.length:
+                    raise Exception ("Runtime error: EAnd not supported for vectors of different lengths")
+                vAnd = []
+                for i in range(v1.length):
+                    if v1.get(i).type == "boolean" and v2.get(i).type == "boolean":
+                        vAnd.append(VBoolean(v1.get(i).value and v2.get(i).value))
+                    else: 
+                        raise Exception ("Runtime error: EAnd not supported for vectors containing non-booleans")
+                return VVector(vAnd)
+                
+        raise Exception ("Runtime error: EAnd not supported for {} and {}".format(v1.type, v2.type))
 
 
 class EOr (Exp):
@@ -347,10 +354,7 @@ class EVector (Exp):
         for item in self._exp:
             v.append(item.eval())
         return VVector(v)
-<<<<<<< HEAD
 
-=======
->>>>>>> 3050989... Cleaning up before merging
 
 #
 # Values
