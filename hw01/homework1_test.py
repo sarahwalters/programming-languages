@@ -8,6 +8,12 @@ vvec = VVector([VInteger(10), VInteger(20), VInteger(30)])
 evec = EVector([EInteger(10), EInteger(20), EInteger(30)])
 evec_plus = EVector([EPlus(EInteger(1), EInteger(2)), EInteger(0)])
 #evec_bool = EVector([EBoolean(True), EAnd(EBoolean(True), EBoolean(False))])
+v1 = EVector([EInteger(2), EInteger(3)])
+v2 = EVector([EInteger(33), EInteger(66)])
+b1 = EVector([EBoolean(True), EBoolean(False)])
+b2 = EVector([EBoolean(False), EBoolean(False)])
+
+def pair (v): return (v.get(0).value, v.get(1).value)
 
 class TestStringMethods (unittest.TestCase):
         def test_EIsZero (self):
@@ -95,6 +101,14 @@ class TestStringMethods (unittest.TestCase):
     #       self.assertEqual(evec_bool.eval().length, 2)
     #       self.assertEqual(evec_bool.eval().get(0).value, True)
     #       self.assertEqual(evec_bool.eval().get(1).value, False)
+
+	def test_EPlus (self):
+		self.assertEqual(EPlus(EInteger(2), EInteger(3)).eval().value, 5)
+		self.assertEqual(pair(EPlus(v1, v2).eval()), (35, 69))
+		self.assertEqual(pair(EMinus(v1, v2).eval()), (-31, -63))
+#		self.assertEqual(pair(EAnd(b1, b2).eval()), (False, False))
+		self.assertEqual(pair(EOr(b1, b2).eval()), (True, False))
+		self.assertEqual(pair(ENot(b1).eval()), (False, True))		
 
 if __name__ == '__main__':
     unittest.main()
