@@ -44,6 +44,43 @@ class EBoolean (Exp):
     def eval (self):
         return VBoolean(self._boolean)
 
+class EIsZero (Exp):
+    # Boolean literal
+
+    def __init__ (self, e):
+        self._exp = e
+
+    def __str__ (self):
+        return "EIsZero({})".format(self._exp)
+
+    def eval (self):
+        v = self._exp.eval()
+        if v.type == "integer":
+            return VBoolean(v.value == 0)
+        raise Exception ("Runtime error: trying to check zero of non-number")
+
+
+class EAnd (Exp):
+    # Boolean literal
+
+    def __init__ (self, b1, b2):
+        self._b1 = b1
+        self._b2 = b2
+
+    def __str__ (self):
+        return "EAnd({})".format(self._b1, self._b2)
+
+    def eval (self):
+        v1 = self._b1.eval()
+        if v1.type == "boolean":
+            if (v1.value):
+                v2 = self._b2.eval()
+                if (v2.type == "boolean"):
+                    return VBoolean(v2.value)
+            else:
+                return VBoolean(False)
+
+        raise Exception ("Runtime error: trying to check zero of non boolean expressions")
 
 class EPlus (Exp):
     # Addition operation
