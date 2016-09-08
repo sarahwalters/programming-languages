@@ -120,6 +120,44 @@ class EIf (Exp):
             return self._else.eval()
 
 
+class EOr (Exp):
+    # Boolean or operation
+
+    def __init__ (self, e1, e2):
+        self._exp1 = e1
+        self._exp2 = e2
+
+    def __str__ (self):
+        return "EOr({},{})".format(self._exp1,self._exp2)
+
+    def eval (self):
+        v1 = self._exp1.eval()
+        if v1.type != "boolean":
+            raise Exception ("Runtime error: value not a boolean")
+        if v1.value:
+            return VBoolean(True)
+
+        v2 = self._exp2.eval()
+        if v2.type != "boolean":
+            raise Exception ("Runtime error: value not a boolean")
+        return VBoolean(v2.value)
+
+
+class ENot (Exp):
+    # Boolean not operation
+
+    def __init__ (self, e):
+        self._exp = e
+
+    def __str__ (self):
+        return "ENot({})".format(self._exp)
+
+    def eval (self):
+        v = self._exp.eval()
+        if v.type != "boolean":
+            raise Exception ("Runtime error: value not a boolean")
+        return VBoolean(not v.value)
+
 #
 # Values
 #
