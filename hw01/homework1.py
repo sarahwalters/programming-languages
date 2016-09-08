@@ -261,6 +261,23 @@ class ENot (Exp):
             raise Exception ("Runtime error: value not a boolean")
         return VBoolean(not v.value)
 
+
+class EVector (Exp):
+    # Vector expression
+
+    def __init__ (self, e):
+        self._exp = e
+
+    def __str__ (self):
+        return "EVector({})".format(self._exp)
+
+    def eval (self):
+        v = []
+	for item in self._exp:
+            v.append(item.eval())
+	return VVector(v)
+
+
 #
 # Values
 #
@@ -275,11 +292,13 @@ class VInteger (Value):
         self.value = i
         self.type = "integer"
 
+
 class VBoolean (Value):
     # Value representation of Booleans
     def __init__ (self,b):
         self.value = b
         self.type = "boolean"
+
 
 class VRational (Value):
     # Value representation of Booleans
@@ -287,3 +306,14 @@ class VRational (Value):
         self.numer = numer
         self.denom = denom
         self.type = "rational"
+
+
+class VVector (Value):
+    # Value representation of vectors
+    def __init__ (self,vector):
+        self.value = vector
+        self.type = "vector"
+        self.length = len(vector)
+
+    def get (self, index):
+        return self.value[index]

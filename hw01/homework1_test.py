@@ -4,6 +4,10 @@ from homework1 import *
 zero = EInteger(0)
 tt = EBoolean(True)
 ff = EBoolean(False)
+vvec = VVector([VInteger(10), VInteger(20), VInteger(30)])
+evec = EVector([EInteger(10), EInteger(20), EInteger(30)])
+evec_plus = EVector([EPlus(EInteger(1), EInteger(2)), EInteger(0)])
+#evec_bool = EVector([EBoolean(True), EAnd(EBoolean(True), EBoolean(False))])
 
 class TestStringMethods (unittest.TestCase):
         def test_EIsZero (self):
@@ -13,7 +17,7 @@ class TestStringMethods (unittest.TestCase):
             with self.assertRaises(Exception):
                 EIsZero(EBoolean(False)).eval();
 
-	def test_EOr (self):
+    def test_EOr (self):
             self.assertEqual(EOr(tt,tt).eval().value, True)
             self.assertEqual(EOr(tt,ff).eval().value, True)
             self.assertEqual(EOr(ff,tt).eval().value, True)
@@ -31,7 +35,7 @@ class TestStringMethods (unittest.TestCase):
             with self.assertRaises(Exception):
                 EAnd(EInteger(3), ff).eval()
 
-	def test_ENot (self):
+        def test_ENot (self):
             self.assertEqual(ENot(tt).eval().value, False)
             self.assertEqual(ENot(ff).eval().value, True)
 
@@ -71,6 +75,26 @@ class TestStringMethods (unittest.TestCase):
             self.assertEqual(ETimes(ERational(1, 2), EInteger(3)).eval().denom, 2)
             self.assertEqual(ETimes(EInteger(3), ERational(1, 2)).eval().numer, 3)
             self.assertEqual(ETimes(EInteger(3), ERational(1, 2)).eval().denom, 2)
+    
+        def test_VVector (self):
+            self.assertEqual(VVector([]).length, 0)
+            self.assertEqual(vvec.length, 3)
+            self.assertEqual(vvec.get(0).value, 10)
+            self.assertEqual(vvec.get(1).value, 20)
+            self.assertEqual(vvec.get(2).value, 30)
+
+        def test_EVector (self):
+            self.assertEqual(EVector([]).eval().length, 0)
+            self.assertEqual(evec.eval().length, 3)
+            self.assertEqual(evec.eval().get(0).value, 10)
+            self.assertEqual(evec.eval().get(1).value, 20)
+            self.assertEqual(evec.eval().get(2).value, 30)
+            self.assertEqual(evec_plus.eval().length, 2)
+            self.assertEqual(evec_plus.eval().get(0).value, 3)
+            self.assertEqual(evec_plus.eval().get(1).value, 0)
+    #       self.assertEqual(evec_bool.eval().length, 2)
+    #       self.assertEqual(evec_bool.eval().get(0).value, True)
+    #       self.assertEqual(evec_bool.eval().get(1).value, False)
 
 if __name__ == '__main__':
     unittest.main()
