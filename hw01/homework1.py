@@ -171,7 +171,7 @@ class EMinus (Exp):
                 vDiff.append(VInteger(v1.get(i).value - v2.get(i).value))
             return VVector(vDiff)
 
-        raise Exception ("Runtime error: trying to subtract non-numbers")
+        raise Exception ("Runtime error: EMinus not supported for {} and {}".format(v1.type, v2.type))
 
 
 class ETimes (Exp):
@@ -188,6 +188,7 @@ class ETimes (Exp):
         v1 = self._exp1.eval()
         v2 = self._exp2.eval()
 
+<<<<<<< HEAD
         if v1.type == "integer":
             if v2.type == "integer":
                 return VInteger(v1.value * v2.value)
@@ -201,6 +202,23 @@ class ETimes (Exp):
                 return VRational(v1.numer * v2.numer, v1.denom * v2.denom)
 
         raise Exception ("Runtime error: trying to multiply non-numbers")
+=======
+        if v1.type == "integer" and v2.type == "integer":
+            return VInteger(v1.value * v2.value)
+
+        if v1.type == "vector" and v2.type == "vector":
+            if v1.length != v2.length: 
+                raise Exception ("Runtime error: ETimes not supported for vectors of different lengths")  
+            innerProduct = 0
+            for i in range(v1.length):
+                if v1.get(i).type == "integer" and v2.get(i).type == "integer":
+                    innerProduct += v1.get(i).value * v2.get(i).value
+                else:
+                    raise Exception ("Runtime error: ETimes not supported for vectors of non-numbers")
+            return VInteger()
+
+        raise Exception ("Runtime error: ETimes not supported for {} and {}".format(v1.type, v2.type))
+>>>>>>> 3050989... Cleaning up before merging
 
 
 class EDiv (Exp):
@@ -269,30 +287,26 @@ class EOr (Exp):
 
         if v1.type == "boolean":
             if v1.value:
-               return VBoolean(True) # short-circuit
+                return VBoolean(True) # short-circuit
             else:
-               v2 = self._exp2.eval()
-               if v2.type == "boolean": 
-                   return VBoolean(v2.value)
-               else: 
-                   raise Exception ("Runtime error: value not a boolean")
+                v2 = self._exp2.eval()
+                if v2.type == "boolean": 
+                    return VBoolean(v2.value)
 
         elif v1.type == "vector":
             v2 = self._exp2.eval()
             if v2.type == "vector":
                 if v1.length != v2.length: 
-                    raise Exception ("Runtime error: trying to or vectors of different lengths")
+                    raise Exception ("Runtime error: EOr not supported for vectors of different lengths")
                 vOr = []
                 for i in range(v1.length):
-                    i1 = v1.get(i)
-                    i2 = v2.get(i)
-                    if i1.type == "boolean" and i2.type == "boolean":
-                        vOr.append(VBoolean(i1.value or i2.value))
+                    if v1.get(i).type == "boolean" and v2.get(i).type == "boolean":
+                        vOr.append(VBoolean(v1.get(i).value or v2.get(i).value))
                     else: 
-                        raise Exception ("Runtime error: cannot use EOr on vectors containing non-booleans")
+                        raise Exception ("Runtime error: EOr not supported for vectors containing non-booleans")
                 return VVector(vOr)
 
-        raise Exception ("Runtime error: EOr not supported for these types")
+        raise Exception ("Runtime error: EOr not supported for {} and {}".format(v1.type, v2.type))
 
 
 class ENot (Exp):
@@ -316,7 +330,7 @@ class ENot (Exp):
                 vNot.append(VBoolean(not v.get(i).value))
             return VVector(vNot)
 
-        raise Exception ("Runtime error: ENot not supported for this type")
+        raise Exception ("Runtime error: ENot not supported for {}".format(v.type))
 
 
 class EVector (Exp):
@@ -333,7 +347,10 @@ class EVector (Exp):
         for item in self._exp:
             v.append(item.eval())
         return VVector(v)
+<<<<<<< HEAD
 
+=======
+>>>>>>> 3050989... Cleaning up before merging
 
 #
 # Values
