@@ -6,7 +6,9 @@
 # Emails:
 #
 # Remarks:
-#
+# should we test mixed integer/rational vectors?
+# should we allow EInteger +-*/ EVector? (currently allow EVector +-*/ EInteger)
+# should we support boolean operations over vector & scalar?
 
 
 
@@ -105,12 +107,17 @@ class EPlus (Exp):
             elif v2.type == "rational":
                 return VRational((v1.numer*v2.denom) + (v2.numer*v1.denom), v2.denom * v1.denom)
 
-        elif v1.type == "vector" and v2.type == "vector":
-            if (v1.length != v2.length):
-                raise Exception ("Runtime error: EAdd not supported for vectors with different lengths")             
+        elif v1.type == "vector":
             vSum = []
-            for i in range(v1.length):
-                vSum.append(self._add(v1.get(i), v2.get(i)))
+            if v2.type == "vector":
+                if (v1.length != v2.length):
+                    raise Exception ("Runtime error: EAdd not supported for vectors with different lengths")             
+                for i in range(v1.length):
+                    vSum.append(self._add(v1.get(i), v2.get(i)))
+                return VVector(vSum)
+            elif v2.type == "integer" or v2.type == "rational":
+                for i in range(v1.length):
+                    vSum.append(self._add(v1.get(i), v2))
             return VVector(vSum)
  
         raise Exception ("Runtime error: EAdd not supported for {} and {}".format(v1.type, v2.type))
@@ -144,12 +151,17 @@ class EMinus (Exp):
             elif v2.type == "rational":
                 return VRational((v1.numer*v2.denom) - (v2.numer*v1.denom), v2.denom * v1.denom)
        
-        elif v1.type == "vector" and v2.type == "vector":
-            if (v1.length != v2.length):
-                raise Exception ("Runtime error: trying to subtract vectors with different lengths")
+        elif v1.type == "vector":
             vDiff = []
-            for i in range(v1.length):
-                vDiff.append(self._subtract(v1.get(i), v2.get(i)))
+            if v2.type == "vector":
+                if (v1.length != v2.length):
+                    raise Exception ("Runtime error: trying to subtract vectors with different lengths")
+                for i in range(v1.length):
+                    vDiff.append(self._subtract(v1.get(i), v2.get(i)))
+                return VVector(vDiff)
+            elif v2.type == "integer" or v2.type == "rational":
+                for i in range(v1.length):
+                    vDiff.append(self._subtract(v1.get(i), v2))
             return VVector(vDiff)
 
         raise Exception ("Runtime error: EMinus not supported for {} and {}".format(v1.type, v2.type))
@@ -183,19 +195,25 @@ class ETimes (Exp):
             elif v2.type == "rational":
                 return VRational(v1.numer * v2.numer, v1.denom * v2.denom)
 
-        elif v1.type == "vector" and v2.type == "vector":
-            if v1.length != v2.length: 
-                raise Exception ("Runtime error: ETimes not supported for vectors of different lengths")  
-            innerProduct = EInteger(0)
-            for i in range(v1.length):
-                term = self._multiply(v1.get(i), v2.get(i))
-                if term.type == "integer":
-                    innerProduct = EPlus(innerProduct, EInteger(term.value))
-                elif term.type == "rational":
-                    innerProduct = EPlus(innerProduct, ERational(term.numer, term.denom))
-                else:
-                    raise Exception("Runtime error: ETimes not supported for vectors containing elements which are not rational or integer")
-            return innerProduct.eval()
+        elif v1.type == "vector":
+            if v2.type == "vector":
+                if v1.length != v2.length: 
+                    raise Exception ("Runtime error: ETimes not supported for vectors of different lengths")  
+                innerProduct = EInteger(0)
+                for i in range(v1.length):
+                    term = self._multiply(v1.get(i), v2.get(i))
+                    if term.type == "integer":
+                        innerProduct = EPlus(innerProduct, EInteger(term.value))
+                    elif term.type == "rational":
+                        innerProduct = EPlus(innerProduct, ERational(term.numer, term.denom))
+                    else:
+                        raise Exception("Runtime error: ETimes not supported for vectors containing elements which are not rational or integer")
+                return innerProduct.eval()
+            if v2.type == "integer" or v2.type == "rational":
+                vProd = []
+                for i in range(v1.length):
+                    vProd.append(self._multiply(v1.get(i), v2))
+                return VVector(vProd)
 
         raise Exception ("Runtime error: ETimes not supported for {} and {}".format(v1.type, v2.type))
 
@@ -224,18 +242,21 @@ class EDiv (Exp):
 
         elif v1.type == "rational":
             if v2.type == "integer":
-                return VRational(v1.numer, v2.denom*v2.value)
+                return VRational(v1.numer, v1.denom*v2.value)
             elif v2.type == "rational":
                 return VRational(v1.numer*v2.denom, v1.denom*v2.numer)
 
         elif v1.type == "vector":
-            if v1.length != v2.length: 
-                raise Exception ("Runtime error: EDiv not supported for vectors of different lengths")  
+            vDiv = []
             if v2.type == "vector":
-                vDiv = []
+                if v1.length != v2.length: 
+                    raise Exception ("Runtime error: EDiv not supported for vectors of different lengths")  
                 for i in range(v1.length):
                     vDiv.append(self._divide(v1.get(i), v2.get(i)))
-                return VVector(vDiv)
+            elif v2.type == "integer" or v2.type == "rational":
+                for i in range(v1.length):
+                    vDiv.append(self._divide(v1.get(i), v2))
+            return VVector(vDiv)
 
         raise Exception ("Runtime error: EDiv not supported for {} and {}".format(v1.type, v2.type))
 

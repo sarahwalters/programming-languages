@@ -78,11 +78,21 @@ class TestStringMethods (unittest.TestCase):
         # vectors of integers
         self.assertEqual(pair(EPlus(v1, v2).eval()), (35, 69))
 
+        # vector of integers plus scalar
+        self.assertEqual(EPlus(v1, EInteger(1)).eval().get(0).value, 3)
+        self.assertEqual(EPlus(v1, EInteger(1)).eval().get(1).value, 4)
+
         # vectors of rationals
         self.assertEqual(EPlus(v3, v4).eval().get(0).numer, 5)
         self.assertEqual(EPlus(v3, v4).eval().get(0).denom, 6)
         self.assertEqual(EPlus(v3, v4).eval().get(1).numer, 6) # todo: update post-simplification
         self.assertEqual(EPlus(v3, v4).eval().get(1).denom, 9) # todo: update post-simplification
+
+        # vector of rationals plus scalar
+        self.assertEqual(EPlus(v3,third).eval().get(0).numer, 5)
+        self.assertEqual(EPlus(v3,third).eval().get(0).denom, 6)
+        self.assertEqual(EPlus(v3,third).eval().get(1).numer, 6) # todo: update post-simplification
+        self.assertEqual(EPlus(v3,third).eval().get(1).denom, 9) # todo: update post-simplification
 
         with self.assertRaises(Exception):
             EPlus(EInteger(1), EBoolean(True)).eval()
@@ -102,9 +112,17 @@ class TestStringMethods (unittest.TestCase):
         # vectors of integers
         self.assertEqual(pair(EMinus(v1, v2).eval()), (-31, -63))
 
+        # vector of integers minus scalar
+        self.assertEqual(EMinus(v1, EInteger(1)).eval().get(0).value, 1)
+        self.assertEqual(EMinus(v1, EInteger(1)).eval().get(1).value, 2)
+
         # vectors of rationals
         self.assertEqual(EMinus(v3, v4).eval().get(0).numer, 1)
         self.assertEqual(EMinus(v3, v4).eval().get(0).denom, 6)
+
+        # vector of rationals minus scalar
+        self.assertEqual(EMinus(v3,third).eval().get(0).numer, 1)
+        self.assertEqual(EMinus(v3,third).eval().get(0).denom, 6)
 
         with self.assertRaises(Exception):
             EMinus(EInteger(1), EBoolean(True)).eval()
@@ -125,9 +143,19 @@ class TestStringMethods (unittest.TestCase):
         self.assertEqual(ETimes(v1, EPlus(v2, v2)).eval().value, 528)
         self.assertEqual(ETimes(v1, EMinus(v2, v2)).eval().value, 0)
 
+        # vector of integers times scalar
+        self.assertEqual(ETimes(v1, EInteger(2)).eval().get(0).value, 4)
+        self.assertEqual(ETimes(v1, EInteger(2)).eval().get(1).value, 6)
+
         # vectors of rationals
         self.assertEqual(ETimes(v3, v4).eval().numer, 15) # todo: update post-simplification
         self.assertEqual(ETimes(v3, v4).eval().denom, 54) # todo: update post-simplification
+
+        # vector of rationals times scalar
+        self.assertEqual(ETimes(v3, half).eval().get(0).numer, 1)
+        self.assertEqual(ETimes(v3, half).eval().get(0).denom, 4)
+        self.assertEqual(ETimes(v3, half).eval().get(1).numer, 1)
+        self.assertEqual(ETimes(v3, half).eval().get(1).denom, 6)
 
         with self.assertRaises(Exception):
             ETimes(EInteger(1), EBoolean(True)).eval()
@@ -140,11 +168,29 @@ class TestStringMethods (unittest.TestCase):
         self.assertEqual(EDiv(EInteger(2),EDiv(EInteger(3),EInteger(4))).eval().numer, 8)
         self.assertEqual(EDiv(EInteger(2),EDiv(EInteger(3),EInteger(4))).eval().denom, 3)
 
+        # vectors of integers
+        self.assertEqual(EDiv(v1, v2).eval().get(0).numer, 2)
+        self.assertEqual(EDiv(v1, v2).eval().get(0).denom, 33)
+        self.assertEqual(EDiv(v1, v2).eval().get(1).numer, 3) # todo: update post-simplification
+        self.assertEqual(EDiv(v1, v2).eval().get(1).denom, 66) # todo: update post-simplification
+
+        # vector of integers divided by scalar
+        self.assertEqual(EDiv(v1, EInteger(5)).eval().get(0).numer, 2)
+        self.assertEqual(EDiv(v1, EInteger(5)).eval().get(0).denom, 5)
+        self.assertEqual(EDiv(v1, EInteger(5)).eval().get(1).numer, 3)
+        self.assertEqual(EDiv(v1, EInteger(5)).eval().get(1).denom, 5)
+
         # vectors of rationals
         self.assertEqual(EDiv(v3, v3).eval().get(0).numer, 2) # todo: update post-simplification
         self.assertEqual(EDiv(v3, v3).eval().get(0).denom, 2) # todo: update post-simplification
         self.assertEqual(EDiv(v3, v3).eval().get(1).numer, 3) # todo: update post-simplification
         self.assertEqual(EDiv(v3, v3).eval().get(1).denom, 3) # todo: update post-simplification
+
+        # vector of rationals divided by scalar
+        self.assertEqual(EDiv(v3, EInteger(2)).eval().get(0).numer, 1)
+        self.assertEqual(EDiv(v3, EInteger(2)).eval().get(0).denom, 4)
+        self.assertEqual(EDiv(v3, EInteger(2)).eval().get(1).numer, 1)
+        self.assertEqual(EDiv(v3, EInteger(2)).eval().get(1).denom, 6)
 
         with self.assertRaises(Exception):
             EDiv(EInteger(3), EBoolean(True)).eval()
