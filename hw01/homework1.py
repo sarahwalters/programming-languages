@@ -60,7 +60,7 @@ class EBoolean (Exp):
 
 
 class EIsZero (Exp):
-    # Boolean literal
+    # IsZero operation
 
     def __init__ (self, e):
         self._exp = e
@@ -90,7 +90,9 @@ class EPlus (Exp):
     def eval (self):
         v1 = self._exp1.eval()
         v2 = self._exp2.eval()
+        return self._add(v1, v2)
 
+    def _add (self, v1, v2):
         if v1.type == "integer":
             if v2.type == "integer":
                 return VInteger(v1.value + v2.value)
@@ -101,17 +103,17 @@ class EPlus (Exp):
             if v2.type == "integer":
                 return VRational((v2.value*v1.denom) + v1.numer, v1.denom)
             elif v2.type == "rational":
-                return VRational((v1.value*v2.denom) + (v2.numer*v1.denom), v2.denom * v1.denom)
+                return VRational((v1.numer*v2.denom) + (v2.numer*v1.denom), v2.denom * v1.denom)
 
         elif v1.type == "vector" and v2.type == "vector":
             if (v1.length != v2.length):
-                raise Exception ("Runtime error: trying to add vectors with different lengths")             
+                raise Exception ("Runtime error: EAdd not supported for vectors with different lengths")             
             vSum = []
             for i in range(v1.length):
-                vSum.append(VInteger(v1.get(i).value + v2.get(i).value))
+                vSum.append(self._add(v1.get(i), v2.get(i)))
             return VVector(vSum)
  
-        raise Exception ("Runtime error: trying to add non-numbers")
+        raise Exception ("Runtime error: EAdd not supported for {} and {}".format(v1.type, v2.type))
 
 
 class EMinus (Exp):
@@ -127,7 +129,9 @@ class EMinus (Exp):
     def eval (self):
         v1 = self._exp1.eval()
         v2 = self._exp2.eval()
+        return self._subtract(v1, v2)
 
+    def _subtract (self, v1, v2):
         if v1.type == "integer":
             if v2.type == "integer":
                 return VInteger(v1.value - v2.value)
@@ -138,14 +142,14 @@ class EMinus (Exp):
             if v2.type == "integer":
                 return VRational(v1.numer - (v2.value * v1.denom), v1.denom)
             elif v2.type == "rational":
-                return VRational((v1.value*v2.denom) - (v2.numer*v1.denom), v2.denom * v1.denom)
+                return VRational((v1.numer*v2.denom) - (v2.numer*v1.denom), v2.denom * v1.denom)
        
         elif v1.type == "vector" and v2.type == "vector":
             if (v1.length != v2.length):
                 raise Exception ("Runtime error: trying to subtract vectors with different lengths")
             vDiff = []
             for i in range(v1.length):
-                vDiff.append(VInteger(v1.get(i).value - v2.get(i).value))
+                vDiff.append(self._subtract(v1.get(i), v2.get(i)))
             return VVector(vDiff)
 
         raise Exception ("Runtime error: EMinus not supported for {} and {}".format(v1.type, v2.type))
@@ -164,7 +168,9 @@ class ETimes (Exp):
     def eval (self):
         v1 = self._exp1.eval()
         v2 = self._exp2.eval()
+        return self._multiply(v1, v2)
 
+    def _multiply (self, v1, v2):
         if v1.type == "integer":
             if v2.type == "integer":
                 return VInteger(v1.value * v2.value)
@@ -180,19 +186,22 @@ class ETimes (Exp):
         elif v1.type == "vector" and v2.type == "vector":
             if v1.length != v2.length: 
                 raise Exception ("Runtime error: ETimes not supported for vectors of different lengths")  
-            innerProduct = 0
+            innerProduct = EInteger(0)
             for i in range(v1.length):
-                if v1.get(i).type == "integer" and v2.get(i).type == "integer":
-                    innerProduct += v1.get(i).value * v2.get(i).value
+                term = self._multiply(v1.get(i), v2.get(i))
+                if term.type == "integer":
+                    innerProduct = EPlus(innerProduct, EInteger(term.value))
+                elif term.type == "rational":
+                    innerProduct = EPlus(innerProduct, ERational(term.numer, term.denom))
                 else:
-                    raise Exception ("Runtime error: ETimes not supported for vectors of non-numbers")
-            return VInteger(innerProduct)
+                    raise Exception("Runtime error: ETimes not supported for vectors containing elements which are not rational or integer")
+            return innerProduct.eval()
 
         raise Exception ("Runtime error: ETimes not supported for {} and {}".format(v1.type, v2.type))
 
 
 class EDiv (Exp):
-    # Multiplication operation
+    # Division operation
 
     def __init__ (self,e1,e2):
         self._exp1 = e1
@@ -204,7 +213,9 @@ class EDiv (Exp):
     def eval (self):
         v1 = self._exp1.eval()
         v2 = self._exp2.eval()
+        return self._divide(v1, v2)
 
+    def _divide (self, v1, v2):
         if v1.type == "integer":
             if v2.type == "integer":
                 return VRational(v1.value, v2.value)
@@ -216,6 +227,15 @@ class EDiv (Exp):
                 return VRational(v1.numer, v2.denom*v2.value)
             elif v2.type == "rational":
                 return VRational(v1.numer*v2.denom, v1.denom*v2.numer)
+
+        elif v1.type == "vector":
+            if v1.length != v2.length: 
+                raise Exception ("Runtime error: EDiv not supported for vectors of different lengths")  
+            if v2.type == "vector":
+                vDiv = []
+                for i in range(v1.length):
+                    vDiv.append(self._divide(v1.get(i), v2.get(i)))
+                return VVector(vDiv)
 
         raise Exception ("Runtime error: EDiv not supported for {} and {}".format(v1.type, v2.type))
 
@@ -243,7 +263,7 @@ class EIf (Exp):
 
 
 class EAnd (Exp):
-    # Boolean literal
+    # Boolean And operation
 
     def __init__ (self, b1, b2):
         self._b1 = b1
@@ -280,7 +300,7 @@ class EAnd (Exp):
 
 
 class EOr (Exp):
-    # Boolean or operation
+    # Boolean Or operation
 
     def __init__ (self, e1, e2):
         self._exp1 = e1
@@ -317,7 +337,7 @@ class EOr (Exp):
 
 
 class ENot (Exp):
-    # Boolean not operation
+    # Boolean Not operation
 
     def __init__ (self, e):
         self._exp = e
@@ -372,14 +392,14 @@ class VInteger (Value):
 
 
 class VBoolean (Value):
-    # Value representation of Booleans
+    # Value representation of booleans
     def __init__ (self,b):
         self.value = b
         self.type = "boolean"
 
 
 class VRational (Value):
-    # Value representation of Booleans
+    # Value representation of rationals
     def __init__ (self, numer, denom):
         self.numer = numer
         self.denom = denom

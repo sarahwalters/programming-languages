@@ -8,6 +8,10 @@ v1 = EVector([EInteger(2), EInteger(3)])
 v2 = EVector([EInteger(33), EInteger(66)])
 b1 = EVector([EBoolean(True), EBoolean(False)])
 b2 = EVector([EBoolean(False), EBoolean(False)])
+half = EDiv(EInteger(1),EInteger(2))
+third = EDiv(EInteger(1),EInteger(3))
+v3 = EVector([half,third])
+v4 = EVector([third,third])
 
 def pair (v): return (v.get(0).value, v.get(1).value)
 
@@ -21,11 +25,13 @@ class TestStringMethods (unittest.TestCase):
 
 
     def test_EOr (self):
+        # booleans
         self.assertEqual(EOr(tt,tt).eval().value, True)
         self.assertEqual(EOr(tt,ff).eval().value, True)
         self.assertEqual(EOr(ff,tt).eval().value, True)
         self.assertEqual(EOr(ff,ff).eval().value, False)
 
+        # vectors
         self.assertEqual(pair(EOr(b1, b2).eval()), (True, False))
 
         with self.assertRaises(Exception):
@@ -47,23 +53,15 @@ class TestStringMethods (unittest.TestCase):
 
 
     def test_ENot (self):
+        # booleans
         self.assertEqual(ENot(tt).eval().value, False)
         self.assertEqual(ENot(ff).eval().value, True)
 
+        # vectors
         self.assertEqual(pair(ENot(b1).eval()), (False, True))  
 
         with self.assertRaises(Exception):
             ENot(EInteger(3)).eval()
-
-
-    def test_EDiv (self):
-        self.assertEqual(EDiv(EInteger(1), EInteger(2)).eval().numer, 1)
-        self.assertEqual(EDiv(EInteger(1), EInteger(2)).eval().denom, 2)
-        self.assertEqual(EDiv(EInteger(2),EDiv(EInteger(3),EInteger(4))).eval().numer, 8)
-        self.assertEqual(EDiv(EInteger(2),EDiv(EInteger(3),EInteger(4))).eval().denom, 3)
-
-        with self.assertRaises(Exception):
-            EDiv(EInteger(3), EBoolean(True)).eval()
 
 
     def test_EPlus (self):
@@ -77,8 +75,14 @@ class TestStringMethods (unittest.TestCase):
         self.assertEqual(EPlus(EInteger(1), ERational(1, 2)).eval().numer, 3)
         self.assertEqual(EPlus(EInteger(1), ERational(1, 2)).eval().denom, 2)
 
-        # vectors
+        # vectors of integers
         self.assertEqual(pair(EPlus(v1, v2).eval()), (35, 69))
+
+        # vectors of rationals
+        self.assertEqual(EPlus(v3, v4).eval().get(0).numer, 5)
+        self.assertEqual(EPlus(v3, v4).eval().get(0).denom, 6)
+        self.assertEqual(EPlus(v3, v4).eval().get(1).numer, 6) # todo: update post-simplification
+        self.assertEqual(EPlus(v3, v4).eval().get(1).denom, 9) # todo: update post-simplification
 
         with self.assertRaises(Exception):
             EPlus(EInteger(1), EBoolean(True)).eval()
@@ -95,22 +99,55 @@ class TestStringMethods (unittest.TestCase):
         self.assertEqual(EMinus(EInteger(1), ERational(1, 2)).eval().numer, 1)
         self.assertEqual(EMinus(EInteger(1), ERational(1, 2)).eval().denom, 2)
 
-        # vectors
+        # vectors of integers
         self.assertEqual(pair(EMinus(v1, v2).eval()), (-31, -63))
+
+        # vectors of rationals
+        self.assertEqual(EMinus(v3, v4).eval().get(0).numer, 1)
+        self.assertEqual(EMinus(v3, v4).eval().get(0).denom, 6)
 
         with self.assertRaises(Exception):
             EMinus(EInteger(1), EBoolean(True)).eval()
 
 
     def test_ETimes (self):
+        # integers
         self.assertEqual(ETimes(EInteger(1), EInteger(3)).eval().value, 3)
+
+        # rationals
         self.assertEqual(ETimes(ERational(1, 2), EInteger(3)).eval().numer, 3)
         self.assertEqual(ETimes(ERational(1, 2), EInteger(3)).eval().denom, 2)
         self.assertEqual(ETimes(EInteger(3), ERational(1, 2)).eval().numer, 3)
         self.assertEqual(ETimes(EInteger(3), ERational(1, 2)).eval().denom, 2)
 
+        # vectors of integers
+        self.assertEqual(ETimes(v1, v2).eval().value, 264)
+        self.assertEqual(ETimes(v1, EPlus(v2, v2)).eval().value, 528)
+        self.assertEqual(ETimes(v1, EMinus(v2, v2)).eval().value, 0)
+
+        # vectors of rationals
+        self.assertEqual(ETimes(v3, v4).eval().numer, 15) # todo: update post-simplification
+        self.assertEqual(ETimes(v3, v4).eval().denom, 54) # todo: update post-simplification
+
         with self.assertRaises(Exception):
             ETimes(EInteger(1), EBoolean(True)).eval()
+
+
+    def test_EDiv (self):
+        # integers
+        self.assertEqual(EDiv(EInteger(1), EInteger(2)).eval().numer, 1)
+        self.assertEqual(EDiv(EInteger(1), EInteger(2)).eval().denom, 2)
+        self.assertEqual(EDiv(EInteger(2),EDiv(EInteger(3),EInteger(4))).eval().numer, 8)
+        self.assertEqual(EDiv(EInteger(2),EDiv(EInteger(3),EInteger(4))).eval().denom, 3)
+
+        # vectors of rationals
+        self.assertEqual(EDiv(v3, v3).eval().get(0).numer, 2) # todo: update post-simplification
+        self.assertEqual(EDiv(v3, v3).eval().get(0).denom, 2) # todo: update post-simplification
+        self.assertEqual(EDiv(v3, v3).eval().get(1).numer, 3) # todo: update post-simplification
+        self.assertEqual(EDiv(v3, v3).eval().get(1).denom, 3) # todo: update post-simplification
+
+        with self.assertRaises(Exception):
+            EDiv(EInteger(3), EBoolean(True)).eval()
 
 
     def test_EVector (self):
