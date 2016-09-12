@@ -1,9 +1,9 @@
 ############################################################
 # HOMEWORK 1
 #
-# Team members:
+# Team members: Sarah Walters, Austin Greene
 #
-# Emails:
+# Emails: Sarah.Walters@students.olin.edu, Austin.Greene@students.olin.edu
 #
 # Remarks:
 # should we test mixed integer/rational vectors?
@@ -100,7 +100,7 @@ class EPlus (Exp):
                 return VInteger(v1.value + v2.value)
             elif v2.type == "rational":
                 return VRational((v1.value*v2.denom) + v2.numer, v2.denom)
-        
+
         elif v1.type == "rational":
             if v2.type == "integer":
                 return VRational((v2.value*v1.denom) + v1.numer, v1.denom)
@@ -111,7 +111,7 @@ class EPlus (Exp):
             vSum = []
             if v2.type == "vector":
                 if (v1.length != v2.length):
-                    raise Exception ("Runtime error: EAdd not supported for vectors with different lengths")             
+                    raise Exception ("Runtime error: EAdd not supported for vectors with different lengths")
                 for i in range(v1.length):
                     vSum.append(self._add(v1.get(i), v2.get(i)))
                 return VVector(vSum)
@@ -119,7 +119,7 @@ class EPlus (Exp):
                 for i in range(v1.length):
                     vSum.append(self._add(v1.get(i), v2))
             return VVector(vSum)
- 
+
         raise Exception ("Runtime error: EAdd not supported for {} and {}".format(v1.type, v2.type))
 
 
@@ -150,7 +150,7 @@ class EMinus (Exp):
                 return VRational(v1.numer - (v2.value * v1.denom), v1.denom)
             elif v2.type == "rational":
                 return VRational((v1.numer*v2.denom) - (v2.numer*v1.denom), v2.denom * v1.denom)
-       
+
         elif v1.type == "vector":
             vDiff = []
             if v2.type == "vector":
@@ -197,8 +197,8 @@ class ETimes (Exp):
 
         elif v1.type == "vector":
             if v2.type == "vector":
-                if v1.length != v2.length: 
-                    raise Exception ("Runtime error: ETimes not supported for vectors of different lengths")  
+                if v1.length != v2.length:
+                    raise Exception ("Runtime error: ETimes not supported for vectors of different lengths")
                 innerProduct = EInteger(0)
                 for i in range(v1.length):
                     term = self._multiply(v1.get(i), v2.get(i))
@@ -249,8 +249,8 @@ class EDiv (Exp):
         elif v1.type == "vector":
             vDiv = []
             if v2.type == "vector":
-                if v1.length != v2.length: 
-                    raise Exception ("Runtime error: EDiv not supported for vectors of different lengths")  
+                if v1.length != v2.length:
+                    raise Exception ("Runtime error: EDiv not supported for vectors of different lengths")
                 for i in range(v1.length):
                     vDiv.append(self._divide(v1.get(i), v2.get(i)))
             elif v2.type == "integer" or v2.type == "rational":
@@ -305,18 +305,22 @@ class EAnd (Exp):
                 return VBoolean(False)
 
         elif v1.type == "vector":
+            vAnd = []
             v2 = self._b2.eval()
             if v2.type == "vector":
                 if v1.length != v2.length:
                     raise Exception ("Runtime error: EAnd not supported for vectors of different lengths")
-                vAnd = []
                 for i in range(v1.length):
                     if v1.get(i).type == "boolean" and v2.get(i).type == "boolean":
                         vAnd.append(VBoolean(v1.get(i).value and v2.get(i).value))
-                    else: 
+                    else:
                         raise Exception ("Runtime error: EAnd not supported for vectors containing non-booleans")
                 return VVector(vAnd)
-                
+            elif v2.type == "boolean":
+                for i in range(v1.length):
+                    vAnd.append(VBoolean(v1.get(i).value and v2.value))
+                return VVector(vAnd)
+
         raise Exception ("Runtime error: EAnd not supported for {} and {}".format(v1.type, v2.type))
 
 
@@ -338,20 +342,24 @@ class EOr (Exp):
                 return VBoolean(True) # short-circuit
             else:
                 v2 = self._exp2.eval()
-                if v2.type == "boolean": 
+                if v2.type == "boolean":
                     return VBoolean(v2.value)
 
         elif v1.type == "vector":
+            vOr = []
             v2 = self._exp2.eval()
             if v2.type == "vector":
-                if v1.length != v2.length: 
+                if v1.length != v2.length:
                     raise Exception ("Runtime error: EOr not supported for vectors of different lengths")
-                vOr = []
                 for i in range(v1.length):
                     if v1.get(i).type == "boolean" and v2.get(i).type == "boolean":
                         vOr.append(VBoolean(v1.get(i).value or v2.get(i).value))
-                    else: 
+                    else:
                         raise Exception ("Runtime error: EOr not supported for vectors containing non-booleans")
+                return VVector(vOr)
+            elif v2.type == "boolean":
+                for i in range(v1.length):
+                    vOr.append(VBoolean(v1.get(i).value or v2.value))
                 return VVector(vOr)
 
         raise Exception ("Runtime error: EOr not supported for {} and {}".format(v1.type, v2.type))
