@@ -16,6 +16,9 @@
 # Expressions
 #
 
+from math import sqrt, ceil
+from functools import reduce
+
 class Exp (object):
     pass
 
@@ -44,7 +47,11 @@ class ERational (Exp):
         return "ERational({}, {})".format(self._numer, self._denom)
 
     def eval (self):
-        return VRational(self._numer, self._denom)
+        rational = VRational(self._numer, self._denom)
+        if rational.denom == 1:
+            return VInteger(rational.numer)
+        else:
+            return rational
 
 
 class EBoolean (Exp):
@@ -98,7 +105,7 @@ class EPlus (Exp):
             if v2.type == "integer":
                 return VInteger(v1.value + v2.value)
             elif v2.type == "rational":
-                return VRational((v1.value*v2.denom) + v2.numer, v2.denom)
+                return ERational((v1.value*v2.denom) + v2.numer, v2.denom).eval()
             elif v2.type == "vector":
                 vSum = []
                 for i in range(v2.length):
@@ -107,9 +114,9 @@ class EPlus (Exp):
 
         elif v1.type == "rational":
             if v2.type == "integer":
-                return VRational((v2.value*v1.denom) + v1.numer, v1.denom)
+                return ERational((v2.value*v1.denom) + v1.numer, v1.denom).eval()
             elif v2.type == "rational":
-                return VRational((v1.numer*v2.denom) + (v2.numer*v1.denom), v2.denom * v1.denom)
+                return ERational((v1.numer*v2.denom) + (v2.numer*v1.denom), v2.denom * v1.denom).eval()
             elif v2.type == "vector":
                 vSum = []
                 for i in range(v2.length):
@@ -152,7 +159,7 @@ class EMinus (Exp):
             if v2.type == "integer":
                 return VInteger(v1.value - v2.value)
             elif v2.type == "rational":
-                return VRational((v1.value*v2.denom) - v2.numer, v2.denom)
+                return ERational((v1.value*v2.denom) - v2.numer, v2.denom).eval()
             elif v2.type == "vector":
                 vDiff = []
                 for i in range(v2.length):
@@ -161,9 +168,9 @@ class EMinus (Exp):
 
         elif v1.type == "rational":
             if v2.type == "integer":
-                return VRational(v1.numer - (v2.value * v1.denom), v1.denom)
+                return ERational(v1.numer - (v2.value * v1.denom), v1.denom).eval()
             elif v2.type == "rational":
-                return VRational((v1.numer*v2.denom) - (v2.numer*v1.denom), v2.denom * v1.denom)
+                return ERational((v1.numer*v2.denom) - (v2.numer*v1.denom), v2.denom * v1.denom).eval()
             elif v2.type == "vector":
                 vDiff = []
                 for i in range(v2.length):
@@ -206,7 +213,7 @@ class ETimes (Exp):
             if v2.type == "integer":
                 return VInteger(v1.value * v2.value)
             elif v2.type == "rational":
-                return VRational(v1.value*v2.numer, v2.denom)
+                return ERational(v1.value*v2.numer, v2.denom).eval()
             elif v2.type == "vector":
                 vProd = []
                 for i in range(v2.length):
@@ -216,9 +223,9 @@ class ETimes (Exp):
 
         elif v1.type == "rational":
             if v2.type == "integer":
-                return VRational(v1.numer * v2.value, v1.denom)
+                return ERational(v1.numer * v2.value, v1.denom).eval()
             elif v2.type == "rational":
-                return VRational(v1.numer * v2.numer, v1.denom * v2.denom)
+                return ERational(v1.numer * v2.numer, v1.denom * v2.denom).eval()
             elif v2.type == "vector":
                 vProd = []
                 for i in range(v2.length):
@@ -266,9 +273,9 @@ class EDiv (Exp):
     def _divide (self, v1, v2):
         if v1.type == "integer":
             if v2.type == "integer":
-                return VRational(v1.value, v2.value)
+                return ERational(v1.value, v2.value).eval()
             elif v2.type == "rational":
-                return VRational(v1.value*v2.denom, v2.numer)
+                return ERational(v1.value*v2.denom, v2.numer).eval()
             elif v2.type == "vector":
                 vDiv = []
                 for i in range(v2.length):
@@ -277,9 +284,9 @@ class EDiv (Exp):
 
         elif v1.type == "rational":
             if v2.type == "integer":
-                return VRational(v1.numer, v1.denom*v2.value)
+                return ERational(v1.numer, v1.denom*v2.value).eval()
             elif v2.type == "rational":
-                return VRational(v1.numer*v2.denom, v1.denom*v2.numer)
+                return ERational(v1.numer*v2.denom, v1.denom*v2.numer).eval()
             elif v2.type == "vector":
                 vDiv = []
                 for i in range(v2.length):
@@ -478,9 +485,38 @@ class VBoolean (Value):
 class VRational (Value):
     # Value representation of rationals
     def __init__ (self, numer, denom):
-        self.numer = numer
-        self.denom = denom
+        self.factorer = Factorer()
+        (self.numer, self.denom) = self._simplify(numer, denom)
         self.type = "rational"
+
+    def _mul (self, x, y):
+        return x * y
+
+    def _simplify (self, numer, denom):
+        numer_factors = self.factorer.factor(numer)
+        denom_factors = self.factorer.factor(denom)
+
+        # List difference to find the factors unique to the numerator & to the denominator
+        i = 0
+        while i < len(numer_factors):
+            factor = numer_factors[i]
+
+            if factor in denom_factors:
+                # if the numerator and denominator share a factor...
+                # remove first instance of the factor from each list
+                numer_factors.remove(factor)
+                denom_factors.remove(factor)
+
+                # step backwards to account for the removed factor
+                i -= 1
+
+            # step forwards to the next factor
+            i += 1
+
+        new_numer = reduce(self._mul, numer_factors, 1)
+        new_denom = reduce(self._mul, denom_factors, 1)
+
+        return (new_numer, new_denom)
 
 
 class VVector (Value):
@@ -492,3 +528,25 @@ class VVector (Value):
 
     def get (self, index):
         return self.value[index]
+
+
+class Factorer:
+    def __init__ (self):
+        self._cache = {}
+
+    def factor (self, n):
+        if n in self._cache:
+            return self._cache[n]
+        else:
+            cap = int(sqrt(n) + 1)
+            for i in range(2, cap):
+                if n/i == float(n)/i:
+                    factorization = self.factor(n/i) + [i]
+                    self._cache[n] = factorization
+                    return factorization
+            return [1, n]
+
+
+if __name__ == "__main__":
+    f = Factorer()
+    print f.factor(723098325)
