@@ -6,11 +6,10 @@
 # Emails: Sarah.Walters@students.olin.edu, Austin.Greene@students.olin.edu
 #
 # Remarks:
-# should we test mixed integer/rational vectors?
-# should we allow EInteger +-*/ EVector? (currently allow EVector +-*/ EInteger)
-# should we support boolean operations over vector & scalar?
-
-
+# We don't have a way to short-circuit boolean operations *and* allow scalar/vector
+# boolean operations -- need to check the type of the second expression to decide what
+# to return, which we can't do without evaluating the second expression. How would you
+# work around this?
 
 
 #
@@ -100,12 +99,22 @@ class EPlus (Exp):
                 return VInteger(v1.value + v2.value)
             elif v2.type == "rational":
                 return VRational((v1.value*v2.denom) + v2.numer, v2.denom)
+            elif v2.type == "vector":
+                vSum = []
+                for i in range(v2.length):
+                    vSum.append(self._add(v1, v2.get(i)))
+                return VVector(vSum)
 
         elif v1.type == "rational":
             if v2.type == "integer":
                 return VRational((v2.value*v1.denom) + v1.numer, v1.denom)
             elif v2.type == "rational":
                 return VRational((v1.numer*v2.denom) + (v2.numer*v1.denom), v2.denom * v1.denom)
+            elif v2.type == "vector":
+                vSum = []
+                for i in range(v2.length):
+                    vSum.append(self._add(v1, v2.get(i)))
+                return VVector(vSum)
 
         elif v1.type == "vector":
             vSum = []
@@ -144,12 +153,22 @@ class EMinus (Exp):
                 return VInteger(v1.value - v2.value)
             elif v2.type == "rational":
                 return VRational((v1.value*v2.denom) - v2.numer, v2.denom)
+            elif v2.type == "vector":
+                vDiff = []
+                for i in range(v2.length):
+                    vDiff.append(self._subtract(v1, v2.get(i)))
+                return VVector(vDiff)
 
         elif v1.type == "rational":
             if v2.type == "integer":
                 return VRational(v1.numer - (v2.value * v1.denom), v1.denom)
             elif v2.type == "rational":
                 return VRational((v1.numer*v2.denom) - (v2.numer*v1.denom), v2.denom * v1.denom)
+            elif v2.type == "vector":
+                vDiff = []
+                for i in range(v2.length):
+                    vDiff.append(self._subtract(v1, v2.get(i)))
+                return VVector(vDiff)
 
         elif v1.type == "vector":
             vDiff = []
@@ -188,12 +207,23 @@ class ETimes (Exp):
                 return VInteger(v1.value * v2.value)
             elif v2.type == "rational":
                 return VRational(v1.value*v2.numer, v2.denom)
+            elif v2.type == "vector":
+                vProd = []
+                for i in range(v2.length):
+                    vProd.append(self._multiply(v1, v2.get(i)))
+                return VVector(vProd)
+
 
         elif v1.type == "rational":
             if v2.type == "integer":
                 return VRational(v1.numer * v2.value, v1.denom)
             elif v2.type == "rational":
                 return VRational(v1.numer * v2.numer, v1.denom * v2.denom)
+            elif v2.type == "vector":
+                vProd = []
+                for i in range(v2.length):
+                    vProd.append(self._multiply(v1, v2.get(i)))
+                return VVector(vProd)
 
         elif v1.type == "vector":
             if v2.type == "vector":
@@ -239,12 +269,22 @@ class EDiv (Exp):
                 return VRational(v1.value, v2.value)
             elif v2.type == "rational":
                 return VRational(v1.value*v2.denom, v2.numer)
+            elif v2.type == "vector":
+                vDiv = []
+                for i in range(v2.length):
+                    vDiv.append(self._divide(v1, v2.get(i)))
+                return VVector(vDiv)
 
         elif v1.type == "rational":
             if v2.type == "integer":
                 return VRational(v1.numer, v1.denom*v2.value)
             elif v2.type == "rational":
                 return VRational(v1.numer*v2.denom, v1.denom*v2.numer)
+            elif v2.type == "vector":
+                vDiv = []
+                for i in range(v2.length):
+                    vDiv.append(self._divide(v1, v2.get(i)))
+                return VVector(vDiv)
 
         elif v1.type == "vector":
             vDiv = []
@@ -294,15 +334,19 @@ class EAnd (Exp):
         return "EAnd({})".format(self._b1, self._b2)
 
     def eval (self):
+        # NOTE: can't short-circuit if we're allowing scalar + vector operations.
+        # Need to eval v2 to check what its type is.
         v1 = self._b1.eval()
+        v2 = self._b2.eval()
 
         if v1.type == "boolean":
-            if v1.value:
-                v2 = self._b2.eval()
-                if v2.type == "boolean":
-                    return VBoolean(v2.value)
-            else:
-                return VBoolean(False)
+            if v2.type == "boolean":
+                return VBoolean(v1.value and v2.value)
+            elif v2.type == "vector":
+                vAnd = []
+                for i in range(v2.length):
+                    vAnd.append(VBoolean(v1.value and v2.get(i).value))
+                return VVector(vAnd)
 
         elif v1.type == "vector":
             vAnd = []
@@ -335,15 +379,19 @@ class EOr (Exp):
         return "EOr({},{})".format(self._exp1,self._exp2)
 
     def eval (self):
+        # NOTE: can't short-circuit if we're allowing scalar + vector operations.
+        # Need to eval v2 to check what its type is.
         v1 = self._exp1.eval()
+        v2 = self._exp2.eval()
 
         if v1.type == "boolean":
-            if v1.value:
-                return VBoolean(True) # short-circuit
-            else:
-                v2 = self._exp2.eval()
-                if v2.type == "boolean":
-                    return VBoolean(v2.value)
+            if v2.type == "boolean":
+                return VBoolean(v1.value or v2.value)
+            elif v2.type == "vector":
+                vOr = []
+                for i in range(v2.length):
+                    vOr.append(VBoolean(v1.value or v2.get(i).value))
+                return VVector(vOr)
 
         elif v1.type == "vector":
             vOr = []
