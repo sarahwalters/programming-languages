@@ -470,6 +470,7 @@ class Value (object):
 
 class VInteger (Value):
     # Value representation of integers
+
     def __init__ (self,i):
         self.value = i
         self.type = "integer"
@@ -477,6 +478,7 @@ class VInteger (Value):
 
 class VBoolean (Value):
     # Value representation of booleans
+
     def __init__ (self,b):
         self.value = b
         self.type = "boolean"
@@ -484,6 +486,7 @@ class VBoolean (Value):
 
 class VRational (Value):
     # Value representation of rationals
+
     def __init__ (self, numer, denom):
         self.factorer = Factorer()
         (self.numer, self.denom) = self._simplify(numer, denom)
@@ -521,6 +524,7 @@ class VRational (Value):
 
 class VVector (Value):
     # Value representation of vectors
+
     def __init__ (self,vector):
         self.value = vector
         self.type = "vector"
@@ -529,6 +533,10 @@ class VVector (Value):
     def get (self, index):
         return self.value[index]
 
+
+#
+# Helper classes
+#
 
 class Factorer:
     def __init__ (self):
@@ -540,7 +548,7 @@ class Factorer:
         else:
             cap = int(sqrt(n) + 1)
             for i in range(2, cap):
-                if n/i == float(n)/i:
+                if n/i == float(n)/i: # n % i == 0
                     factorization = self.factor(n/i) + [i]
                     self._cache[n] = factorization
                     return factorization
