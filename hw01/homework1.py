@@ -47,7 +47,11 @@ class ERational (Exp):
         return "ERational({}, {})".format(self._numer, self._denom)
 
     def eval (self):
-        return VRational(self._numer, self._denom)
+        rational = VRational(self._numer, self._denom)
+        if rational.denom == 1:
+            return VInteger(rational.numer)
+        else:
+            return rational
 
 
 class EBoolean (Exp):
@@ -544,10 +548,5 @@ class Factorer:
 
 
 if __name__ == "__main__":
-    r = VRational(700,70)
-    print
-    print "{}/{}".format(r.numer, r.denom)
-    print
-
     f = Factorer()
     print f.factor(723098325)
