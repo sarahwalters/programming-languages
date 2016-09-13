@@ -200,6 +200,15 @@ class TestStringMethods (unittest.TestCase):
         self.assertEqual(EDiv(EInteger(2),EDiv(EInteger(3),EInteger(4))).eval().numer, 8)
         self.assertEqual(EDiv(EInteger(2),EDiv(EInteger(3),EInteger(4))).eval().denom, 3)
 
+        # integers, explicitly testing simplification
+        self.assertEqual(EDiv(EInteger(1), EInteger(1)).eval().value, 1)
+        self.assertEqual(EDiv(EInteger(8), EInteger(2)).eval().value, 4)
+        self.assertEqual(EDiv(EInteger(723098325), EInteger(1069)).eval().value, 676425)
+        self.assertEqual(EDiv(EInteger(723), EInteger(9)).eval().numer, 241)
+        self.assertEqual(EDiv(EInteger(723), EInteger(9)).eval().denom, 3)
+        self.assertEqual(EDiv(EInteger(132175), EInteger(723098325)).eval().numer, 17)
+        self.assertEqual(EDiv(EInteger(132175), EInteger(723098325)).eval().denom, 93003)
+
         # vectors of integers
         self.assertEqual(EDiv(v1, v2).eval().get(0).numer, 2)
         self.assertEqual(EDiv(v1, v2).eval().get(0).denom, 33)
