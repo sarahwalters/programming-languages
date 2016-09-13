@@ -545,8 +545,3 @@ class Factorer:
                     self._cache[n] = factorization
                     return factorization
             return [1, n]
-
-
-if __name__ == "__main__":
-    f = Factorer()
-    print f.factor(723098325)
