@@ -33,6 +33,7 @@ class TestStringMethods (unittest.TestCase):
 
         # vectors
         self.assertEqual(pair(EOr(b1, b2).eval()), (True, False))
+        self.assertEqual(pair(EOr(b1, ff).eval()), (True, False))
 
         with self.assertRaises(Exception):
             EOr(EInteger(3), ff).eval()
@@ -47,6 +48,7 @@ class TestStringMethods (unittest.TestCase):
 
         # vectors
         self.assertEqual(pair(EAnd(b1, b2).eval()), (False, False))
+        self.assertEqual(pair(EAnd(b1, tt).eval()), (True, False))
 
         with self.assertRaises(Exception):
             EAnd(EInteger(3), ff).eval()
@@ -58,7 +60,7 @@ class TestStringMethods (unittest.TestCase):
         self.assertEqual(ENot(ff).eval().value, True)
 
         # vectors
-        self.assertEqual(pair(ENot(b1).eval()), (False, True))  
+        self.assertEqual(pair(ENot(b1).eval()), (False, True))
 
         with self.assertRaises(Exception):
             ENot(EInteger(3)).eval()
