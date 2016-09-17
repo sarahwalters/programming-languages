@@ -241,8 +241,3 @@ INITIAL_PRIM_DICT = {
     "*": oper_times,
     "-": oper_minus
 }
-
-
-if __name__ == "__main__":
-     print str(ELetS([("a",EInteger(99)),
-                 ("b",EInteger(66))],EId("a")).expand())
