@@ -115,9 +115,11 @@ class ELet (Exp):
     def substitute (self,id,new_e):
         selfIds = [i for (i, e) in self._bindings] # the ids associated with this ELet
 
-        # apply let statements concurrently
+        # Apply substitutions to list of bindings concurrently
         substitutedBindings = [(i, e.substitute(id, new_e)) for (i, e) in self._bindings]
 
+        # Always apply substitutions to bindings; only apply substitutions to the
+        # expression-to-be-evaluated if the id in question isn't part of this let statement
         if id in selfIds:
             return ELet(substitutedBindings,
                         self._letExp)
@@ -133,7 +135,7 @@ class ELetS (Exp):
         self._letExp = letExp
 
     def __str__ (self):
-        return "ELet({},{})".format(self._bindings, self._letExp)
+        return "ELetS({},{})".format(self._bindings, self._letExp)
 
     def eval (self,prim_dict):
         new_letExp = self._letExp
@@ -145,7 +147,7 @@ class ELetS (Exp):
     def substitute (self,id,new_e):
         selfIds = [i for (i, e) in self._bindings] # the ids associated with this ELet
 
-        # apply let statements sequentially
+        # Apply substitutions to list of bindings sequentially
         index = 0
         substitutedBindings = []
         for (i, e) in self._bindings:
@@ -153,6 +155,8 @@ class ELetS (Exp):
                 e = e.substitute(si, se)
             substitutedBindings.append((i, e))
 
+        # Always apply substitutions to bindings; only apply substitutions to the
+        # expression-to-be-evaluated if the id in question isn't part of this let statement
         if id in selfIds:
             return ELet(substitutedBindings,
                         self._letExp)
