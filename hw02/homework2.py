@@ -6,7 +6,7 @@
 # Emails:
 #
 # Remarks:
-#
+# How do we do concurrent bindings? (last case for 1a)
 
 
 
@@ -96,28 +96,68 @@ class EIf (Exp):
 
 
 class ELet (Exp):
-    # local binding
+    # concurrent local binding
 
-    def __init__ (self,id,e1,e2):
-        self._id = id
-        self._e1 = e1
-        self._e2 = e2
+    def __init__ (self,bindings,letExp):
+        self._bindings = bindings
+        self._letExp = letExp
 
     def __str__ (self):
-        return "ELet({},{},{})".format(self._id,self._e1,self._e2)
+        return "ELet({},{})".format(self._bindings, self._letExp)
 
     def eval (self,prim_dict):
-        new_e2 = self._e2.substitute(self._id,self._e1)
-        return new_e2.eval(prim_dict)
+        new_letExp = self._letExp
+        for (id, e) in self._bindings:
+            new_letExp = new_letExp.substitute(id,e)
+
+        return new_letExp.eval(prim_dict)
 
     def substitute (self,id,new_e):
-        if id == self._id:
-            return ELet(self._id,
-                        self._e1.substitute(id,new_e),
-                        self._e2)
-        return ELet(self._id,
-                    self._e1.substitute(id,new_e),
-                    self._e2.substitute(id,new_e))
+        selfIds = [i for (i, e) in self._bindings] # the ids associated with this ELet
+
+        # apply let statements concurrently
+        substitutedBindings = [(i, e.substitute(id, new_e)) for (i, e) in self._bindings]
+
+        if id in selfIds:
+            return ELet(substitutedBindings,
+                        self._letExp)
+        return ELet(substitutedBindings,
+                    self._letExp.substitute(id,new_e))
+
+
+class ELetS (Exp):
+    # sequential local binding
+
+    def __init__ (self,bindings,letExp):
+        self._bindings = bindings
+        self._letExp = letExp
+
+    def __str__ (self):
+        return "ELet({},{})".format(self._bindings, self._letExp)
+
+    def eval (self,prim_dict):
+        new_letExp = self._letExp
+        for (id, e) in self._bindings:
+            new_letExp = new_letExp.substitute(id,e)
+
+        return new_letExp.eval(prim_dict)
+
+    def substitute (self,id,new_e):
+        selfIds = [i for (i, e) in self._bindings] # the ids associated with this ELet
+
+        # apply let statements sequentially
+        index = 0
+        substitutedBindings = []
+        for (i, e) in self._bindings:
+            for (si, se) in substitutedBindings:
+                e = e.substitute(si, se)
+            substitutedBindings.append((i, e))
+
+        if id in selfIds:
+            return ELet(substitutedBindings,
+                        self._letExp)
+        return ELet(substitutedBindings,
+                    self._letExp.substitute(id,new_e))
 
 
 class EId (Exp):
@@ -138,7 +178,7 @@ class EId (Exp):
         return self
 
 
-    
+
 #
 # Values
 #
@@ -165,7 +205,7 @@ class VBoolean (Value):
 
 # Primitive operations
 
-def oper_plus (v1,v2): 
+def oper_plus (v1,v2):
     if v1.type == "integer" and v2.type == "integer":
         return VInteger(v1.value + v2.value)
     raise Exception ("Runtime error: trying to add non-numbers")
@@ -188,3 +228,7 @@ INITIAL_PRIM_DICT = {
     "*": oper_times,
     "-": oper_minus
 }
+
+
+if __name__ == "__main__":
+    print "none"
