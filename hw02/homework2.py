@@ -6,7 +6,7 @@
 # Emails:
 #
 # Remarks:
-# How do we do concurrent bindings? (last case for 1a)
+# questions on ELetS test cases -- should ELet have an expand method?
 
 
 
@@ -103,12 +103,13 @@ class ELet (Exp):
         self._letExp = letExp
 
     def __str__ (self):
-        return "ELet({},{})".format(self._bindings, self._letExp)
+        prettyBindings = [(i, str(e)) for (i, e) in self._bindings]
+        return "ELet({},{})".format(prettyBindings, self._letExp)
 
     def eval (self,prim_dict):
         new_letExp = self._letExp
         for (id, e) in self._bindings:
-            new_letExp = new_letExp.substitute(id,e)
+            new_letExp = new_letExp.substitute(id, e)
 
         return new_letExp.eval(prim_dict)
 
@@ -135,12 +136,13 @@ class ELetS (Exp):
         self._letExp = letExp
 
     def __str__ (self):
-        return "ELetS({},{})".format(self._bindings, self._letExp)
+        prettyBindings = [(i, str(e)) for (i, e) in self._bindings]
+        return "ELetS({},{})".format(prettyBindings, self._letExp)
 
     def eval (self,prim_dict):
         new_letExp = self._letExp
         for (id, e) in self._bindings:
-            new_letExp = new_letExp.substitute(id,e)
+            new_letExp = new_letExp.substitute(id, e)
 
         return new_letExp.eval(prim_dict)
 
@@ -162,6 +164,13 @@ class ELetS (Exp):
                         self._letExp)
         return ELet(substitutedBindings,
                     self._letExp.substitute(id,new_e))
+
+    def expand (self):
+        if len(self._bindings) == 1:
+            return ELet(self._bindings, self._letExp)
+        else:
+            innerLet = ELetS(self._bindings[1:], self._letExp).expand()
+            return ELet([self._bindings[0]], innerLet)
 
 
 class EId (Exp):
@@ -235,4 +244,5 @@ INITIAL_PRIM_DICT = {
 
 
 if __name__ == "__main__":
-    print "none"
+     print str(ELetS([("a",EInteger(99)),
+                 ("b",EInteger(66))],EId("a")).expand())
