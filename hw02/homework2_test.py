@@ -57,6 +57,23 @@ class TestStringMethods (unittest.TestCase):
                                        ("b",EId("a"))],
                                        EPrimCall("-",[EId("a"),EId("b")]))).expand().eval(INITIAL_PRIM_DICT).value, 0)
 
+    def test_EDef(self):
+        EDef("add1", ["x"], EPrimCall("+", [EInteger(1), EId("x")])).eval(INITIAL_PRIM_DICT)
+        EDef("add2", "x", EPrimCall("+", [EInteger(2), EId("x")])).eval(INITIAL_PRIM_DICT)
+        self.assertIn("add1", FUNC_DICT)
+        self.assertIn("add2", FUNC_DICT)
 
+
+    def test_ECall(self):
+        EDef("add1", ["x"], EPrimCall("+", [EInteger(1), EId("x")])).eval(INITIAL_PRIM_DICT)
+        self.assertEqual(ECall("add1", [EInteger(1)]).eval(INITIAL_PRIM_DICT).value, 2)
+        self.assertEqual(ECall("add1", EInteger(1)).eval(INITIAL_PRIM_DICT).value, 2)
+
+        FUN_DICT = {
+            "+1": {"params":["x"],
+                   "body":EPrimCall("+",[EId("x"),EInteger(1)])},
+        }
+
+        self.assertEqual(ECall("+1", [EInteger(100)]).eval(INITIAL_PRIM_DICT,FUN_DICT).value, 101)
 if __name__ == '__main__':
     unittest.main()
