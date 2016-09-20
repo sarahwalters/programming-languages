@@ -78,6 +78,21 @@ class EBoolean (Exp):
     def substitute (self,id,new_e):
         return self
 
+class EValue (Exp):
+    # Boolean literal
+
+    def __init__ (self,v):
+        self._value = v
+
+    def __str__ (self):
+        return "EValue({})".format(self._value)
+
+    def eval (self,prim_dict,fun_dict=FUNC_DICT):
+        return self._value
+
+    def substitute (self,id,new_e):
+        return self
+
 
 class EPrimCall (Exp):
 
@@ -249,6 +264,31 @@ class ELetS (Exp):
         else:
             innerLet = ELetS(self._bindings[1:], self._letExp).expand()
             return ELet([self._bindings[0]], innerLet)
+
+
+class ELetV (Exp):
+    # local eager binding
+
+    def __init__ (self,id,e1,e2):
+        self._id = id
+        self._e1 = e1
+        self._e2 = e2
+
+    def __str__ (self):
+        return "ELetV({},{},{})".format(self._id,self._e1,self._e2)
+
+    def eval (self,prim_dict,fun_dict=FUNC_DICT):
+        new_e2 = self._e2.substitute(self._id, EValue(self._e1.eval(INITIAL_PRIM_DICT)))
+        return new_e2.eval(prim_dict)
+
+    def substitute (self,id,new_e):
+        if id == self._id:
+            return ELet(self._id,
+                        self._e1.substitute(id,new_e),
+                        self._e2)
+        return ELet(self._id,
+                    self._e1.substitute(id,new_e),
+                    self._e2.substitute(id,new_e))
 
 
 class EId (Exp):
