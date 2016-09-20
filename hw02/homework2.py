@@ -291,6 +291,46 @@ class ELetV (Exp):
                     self._e2.substitute(id,new_e))
 
 
+class ECache (Exp):
+    def __init__ (self, e):
+        self._e = e
+        self._v = None
+
+    def eval (self, prim_dict, fun_dict=FUNC_DICT):
+        if self._v == None:
+            self._v = self._e.eval(prim_dict)
+        return self._v
+
+    def substitute (self, id, new_e):
+        self._e.substitute(id, new_e)
+        return self
+
+
+class ELetN (Exp):
+    # "memoized" local binding
+
+    def __init__ (self, id, e1, e2):
+        self._id = id
+        self._e1 = ECache(e1)
+        self._e2 = e2
+
+    def __str__ (self):
+        return "ELetN({},{},{})".format(id, self._e1, self._e2)
+
+    def eval(self, prim_dict, fun_dict=FUNC_DICT):
+        new_e2 = self._e2.substitute(self._id, self._e1)
+        return new_e2.eval(prim_dict)
+
+    def substitute (self, id, new_e):
+        if id == self._id:
+            return ELetN(self._id,
+                        self._e1.substitute(id,new_e),
+                        self._e2)
+        return ELetN(self._id,
+                    self._e1.substitute(id,new_e),
+                    self._e2.substitute(id,new_e))
+
+
 class EId (Exp):
     # identifier
 
