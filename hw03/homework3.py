@@ -380,6 +380,7 @@ def recursiveExpand(operation, args):
 
 def parse_natural (input):
     # parse a string into an element of the abstract representation
+    # Math grammar from https://www.cs.rochester.edu/~nelson/courses/csc_173/grammars/parsetrees.html
 
     # Grammar:
 
