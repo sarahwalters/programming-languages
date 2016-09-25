@@ -9,7 +9,7 @@
 #
 
 import sys
-from pyparsing import Word, Literal,  Keyword, Forward, alphas, alphanums, OneOrMore
+from pyparsing import Word, Literal,  Keyword, Forward, alphas, alphanums, OneOrMore, delimitedList
 
 
 #
@@ -424,41 +424,55 @@ def parse_natural (input):
     pBOOLEAN.setParseAction(lambda result: EBoolean(result[0]=="true"))
 
     pEXPR = Forward()
+    pPLUS = Forward()
+    pTIMES = Forward()
+    pSUB = Forward()
+    pPARENS = Forward()
+    pUSERFUNC = Forward()
 
     pCONDREST = Keyword("?") + pEXPR + Keyword(":") + pEXPR
     pCONDREST.setParseAction(lambda result: {"e1": result[1], "e2": result[3]})
 
-    pIF = pBOOLEAN + pCONDREST
+    pBOOLEANRESULT = (pBOOLEAN | pPARENS | pUSERFUNC)
+    pIF = pBOOLEANRESULT + pCONDREST
     pIF.setParseAction(lambda result: EIf(result[0],result[1]["e1"],result[1]["e2"]))
+
+    pPARENS << "(" + pEXPR + ")"
+    pPARENS.setParseAction(lambda result: result[1])
+
+    #pINTEGERRESULT = (pPARENS | pIDENTIFIER | pINTEGER | pPLUS | pTIMES | pSUB)
+    pINTEGERRESULT = (pPARENS | pIDENTIFIER | pINTEGER | pSUB)
 
     pPLUSREST = Keyword("+") + pEXPR
     pPLUSREST.setParseAction(lambda result: result[1])
 
-    pPLUS = pINTEGER + pPLUSREST
+    pPLUS << pINTEGERRESULT + pPLUSREST
     pPLUS.setParseAction(lambda result: ECall("+", [result[0], result[1]]))
 
     pTIMESREST = Keyword("*") + pEXPR
     pTIMESREST.setParseAction(lambda result: result[1])
 
-    pTIMES = pINTEGER + pTIMESREST
+    pTIMES << pINTEGERRESULT + pTIMESREST
     pTIMES.setParseAction(lambda result: ECall("*", [result[0], result[1]]))
 
     pSUBREST = Keyword("-") + pEXPR
     pSUBREST.setParseAction(lambda result: result[1])
 
-    pSUB = pINTEGER + pSUBREST
+    pSUB << pINTEGERRESULT + pSUBREST
     pSUB.setParseAction(lambda result: ECall("-", [result[0], result[1]]))
-
-    pPARENS = "(" + pEXPR + ")"
-    pPARENS.setParseAction(lambda result: result[1])
 
     pBINDING = pNAME + Keyword("=") + pEXPR
     pBINDING.setParseAction(lambda result: (result[0],result[2]))
 
-    pLET = Keyword("let") + "(" + pBINDING + ")" + pEXPR
-    pLET.setParseAction(lambda result: ELet([result[2]],result[4]))
+    pLET = Keyword("let") + "(" + delimitedList(pBINDING) + ")" + pEXPR
+    pLET.setParseAction(lambda result: ELet(result[2:len(result)-2],result[len(result)-1]))
 
-    pEXPR << (pPARENS | pTIMES | pPLUS | pSUB | pIF | pINTEGER | pBOOLEAN | pLET | pIDENTIFIER)
+    pFUNCPARAM = (pIF | pSUB | pBOOLEAN | pINTEGER | pUSERFUNC | pIDENTIFIER)  # should maybe allow times/plus/sub
+
+    pUSERFUNC << pNAME + "(" + delimitedList(pFUNCPARAM) + ")"
+    pUSERFUNC.setParseAction(lambda result: ECall(result[0],result[2:len(result)-1]))
+
+    pEXPR << (pIF | pBOOLEAN | pTIMES | pPLUS | pSUB | pPARENS | pINTEGER | pLET | pUSERFUNC | pIDENTIFIER)
 
     result = pEXPR.parseString(input)[0]
     return result    # the first element of the result is the expression
@@ -494,6 +508,7 @@ def shell_natural ():
         inp = raw_input("calc/nat> ")
         if not inp:
             return
+        print inp
         exp = parse_natural(inp)
         print "Abstract representation:", exp
         v = exp.eval(INITIAL_FUN_DICT)
