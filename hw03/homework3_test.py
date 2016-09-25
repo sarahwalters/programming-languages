@@ -36,5 +36,24 @@ class TestStringMethods (unittest.TestCase):
         self.assertEqual(parse(inp8).eval(INITIAL_FUN_DICT).value, 25)
         self.assertEqual(parse(inp9).eval(INITIAL_FUN_DICT).value, 11)
 
+    def test_parsePlus(self):
+        inp1 = "(+ 1 2)"
+        inp2 = "(+ 1 2 3)"
+        inp3 = "(+ 1 2 3 4 5)"
+
+        self.assertEqual(parse(inp1).eval(INITIAL_FUN_DICT).value, 3)
+        self.assertEqual(parse(inp2).eval(INITIAL_FUN_DICT).value, 6)
+        self.assertEqual(parse(inp3).eval(INITIAL_FUN_DICT).value, 15)
+
+    def test_parseTimes(self):
+        inp1 = "(* 1 2)"
+        inp2 = "(* 1 2 3)"
+        inp3 = "(* 1 2 3 4)"
+
+        self.assertEqual(parse(inp1).eval(INITIAL_FUN_DICT).value, 2)
+        self.assertEqual(parse(inp2).eval(INITIAL_FUN_DICT).value, 6)
+        self.assertEqual(parse(inp3).eval(INITIAL_FUN_DICT).value, 24)
+
+
 if __name__ == '__main__':
     unittest.main()
