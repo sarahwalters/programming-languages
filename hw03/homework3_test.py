@@ -84,6 +84,12 @@ class TestStringMethods (unittest.TestCase):
         inp7 = "(zero? (1) ? 1 : 2) + 55"
         inp8 = "let (x = 4 + 5 * 6) let (y = x * 2) square(y)"
         inp9 = "(34 * 2) * (34 * 2)"
+        inp10 = "let (x = 10, y = 20) +1 (x + y)"
+        inp11 = "3 * 4 + 5 * 6"
+        inp12 = "let (x = 10, y = 20, z = 30) x * y + z"
+        inp13 = "let (x = 10, y = 20) (zero? (x - y) ? x * x : x)"
+        inp14 = "sum_from_to (1, 10)"
+        inp15 = "let (x = 10) let (y = x * x) y"
 
         self.assertEqual(parse_natural(inp1).eval(INITIAL_FUN_DICT).value, 11)
         self.assertEqual(parse_natural(inp2).eval(INITIAL_FUN_DICT).value, 410)
@@ -94,6 +100,12 @@ class TestStringMethods (unittest.TestCase):
         self.assertEqual(parse_natural(inp7).eval(INITIAL_FUN_DICT).value, 57)
         self.assertEqual(parse_natural(inp8).eval(INITIAL_FUN_DICT).value, 4624)
         self.assertEqual(parse_natural(inp9).eval(INITIAL_FUN_DICT).value, 4624)
+        self.assertEqual(parse_natural(inp10).eval(INITIAL_FUN_DICT).value, 31)
+        self.assertEqual(parse_natural(inp11).eval(INITIAL_FUN_DICT).value, 42)
+        self.assertEqual(parse_natural(inp12).eval(INITIAL_FUN_DICT).value, 230)
+        self.assertEqual(parse_natural(inp13).eval(INITIAL_FUN_DICT).value, 10)
+        self.assertEqual(parse_natural(inp14).eval(INITIAL_FUN_DICT).value, 55)
+        self.assertEqual(parse_natural(inp15).eval(INITIAL_FUN_DICT).value, 100)
 
 
 if __name__ == '__main__':

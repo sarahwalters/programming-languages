@@ -9,7 +9,7 @@
 #
 
 import sys
-from pyparsing import Word, Literal,  Keyword, Forward, alphas, alphanums, OneOrMore, delimitedList, Group, opAssoc, operatorPrecedence
+from pyparsing import Word, Literal, Keyword, Forward, alphas, alphanums, OneOrMore, delimitedList
 
 
 #
