@@ -320,7 +320,10 @@ def parse (input):
     pTIMES = "(" + Keyword("*") + pEXPR + pEXPR + ")"
     pTIMES.setParseAction(lambda result: ECall("*",[result[2],result[3]]))
 
-    pEXPR << (pINTEGER | pBOOLEAN | pIDENTIFIER | pIF | pLET | pPLUS | pTIMES)
+    pUSERFUNC = "(" + pNAME + OneOrMore(pEXPR) + ")"
+    pUSERFUNC.setParseAction(lambda result: ECall(result[1], result[2:len(result)-1]))
+
+    pEXPR << (pINTEGER | pBOOLEAN | pIDENTIFIER | pIF | pLET | pPLUS | pTIMES | pUSERFUNC)
 
     result = pEXPR.parseString(input)[0]
     return result    # the first element of the result is the expression
@@ -345,9 +348,9 @@ sys.setrecursionlimit(10000)
 
 
 if __name__ == "__main__":
-    test = "(let ((a 1) (b 2) (c 3) (d 4) (e 5) (f 6)) f)"
-    test2 = "(let ((a (let ((x 1) (y 2)) x)) (b (let ((x 1) (y 2)) y))) (let ((b a) (a b)) a))"
-    exp = parse(test)
-    print "Abstract representation:", exp
-    v = exp.eval(INITIAL_FUN_DICT)
-    print v
+    shell()
+    # test = "(some-unknown-function 10 20 30)"
+    # exp = parse(test)
+    # print "Abstract representation:", exp
+    # v = exp.eval(INITIAL_FUN_DICT)
+    # print v
