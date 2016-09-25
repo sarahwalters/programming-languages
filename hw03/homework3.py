@@ -10,7 +10,7 @@
 
 
 import sys
-from pyparsing import Word, Literal,  Keyword, Forward, alphas, alphanums
+from pyparsing import Word, Literal,  Keyword, Forward, alphas, alphanums, OneOrMore
 
 
 #
@@ -311,19 +311,29 @@ def parse (input):
     pBINDING = "(" + pNAME + pEXPR + ")"
     pBINDING.setParseAction(lambda result: (result[1],result[2]))
 
-    pLET = "(" + Keyword("let") + "(" + pBINDING + ")" + pEXPR + ")"
-    pLET.setParseAction(lambda result: ELet([result[3]],result[5]))
+    pLET = "(" + Keyword("let") + "(" + OneOrMore(pBINDING) + ")" + pEXPR + ")"
+    pLET.setParseAction(lambda result: ELet(result[3:len(result)-3],result[len(result)-2]))
 
-    pPLUS = "(" + Keyword("+") + pEXPR + pEXPR + ")"
-    pPLUS.setParseAction(lambda result: ECall("+",[result[2],result[3]]))
+    pPLUS = "(" + Keyword("+") + pEXPR + OneOrMore(pEXPR) + ")"
+    pPLUS.setParseAction(lambda result: recursiveExpand("+",result[2:len(result)-1]))
 
-    pTIMES = "(" + Keyword("*") + pEXPR + pEXPR + ")"
-    pTIMES.setParseAction(lambda result: ECall("*",[result[2],result[3]]))
+    pTIMES = "(" + Keyword("*") + pEXPR + OneOrMore(pEXPR) + ")"
+    pTIMES.setParseAction(lambda result: recursiveExpand("*",result[2:len(result)-1]))
 
-    pEXPR << (pINTEGER | pBOOLEAN | pIDENTIFIER | pIF | pLET | pPLUS | pTIMES)
+    pUSERFUNC = "(" + pNAME + OneOrMore(pEXPR) + ")"
+    pUSERFUNC.setParseAction(lambda result: ECall(result[1],result[2:len(result)-1]))
+
+    pEXPR << (pINTEGER | pBOOLEAN | pIDENTIFIER | pIF | pLET | pPLUS | pTIMES | pUSERFUNC)
 
     result = pEXPR.parseString(input)[0]
     return result    # the first element of the result is the expression
+
+
+def recursiveExpand(operation, args):
+    if len(args) == 2:
+        return ECall(operation, [args[0], args[1]])
+    else:
+        return ECall(operation, [args[0], recursiveExpand(operation, args[1:])])
 
 
 def shell ():
@@ -342,5 +352,3 @@ def shell ():
 
 # increase stack size to let us call recursive functions quasi comfortably
 sys.setrecursionlimit(10000)
-
-
