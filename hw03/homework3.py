@@ -315,13 +315,13 @@ def parse (input):
     pLET.setParseAction(lambda result: ELet(result[3:len(result)-3],result[len(result)-2]))
 
     pPLUS = "(" + Keyword("+") + pEXPR + OneOrMore(pEXPR) + ")"
-    pPLUS.setParseAction(lambda result: recursiveExpand("+", result[2:len(result)-1]))
+    pPLUS.setParseAction(lambda result: recursiveExpand("+",result[2:len(result)-1]))
 
     pTIMES = "(" + Keyword("*") + pEXPR + OneOrMore(pEXPR) + ")"
-    pTIMES.setParseAction(lambda result: recursiveExpand("*", result[2:len(result)-1]))
+    pTIMES.setParseAction(lambda result: recursiveExpand("*",result[2:len(result)-1]))
 
     pUSERFUNC = "(" + pNAME + OneOrMore(pEXPR) + ")"
-    pUSERFUNC.setParseAction(lambda result: ECall(result[1], result[2:len(result)-1]))
+    pUSERFUNC.setParseAction(lambda result: ECall(result[1],result[2:len(result)-1]))
 
     pEXPR << (pINTEGER | pBOOLEAN | pIDENTIFIER | pIF | pLET | pPLUS | pTIMES | pUSERFUNC)
 
@@ -352,12 +352,3 @@ def shell ():
 
 # increase stack size to let us call recursive functions quasi comfortably
 sys.setrecursionlimit(10000)
-
-
-if __name__ == "__main__":
-    shell()
-    # test = "(some-unknown-function 10 20 30)"
-    # exp = parse(test)
-    # print "Abstract representation:", exp
-    # v = exp.eval(INITIAL_FUN_DICT)
-    # print v
