@@ -9,7 +9,7 @@
 #
 
 import sys
-from pyparsing import Word, Literal,  Keyword, Forward, alphas, alphanums, OneOrMore, delimitedList
+from pyparsing import Word, Literal,  Keyword, Forward, alphas, alphanums, OneOrMore, delimitedList, Group, opAssoc, operatorPrecedence
 
 
 #
@@ -93,7 +93,6 @@ class EIf (Exp):
     # Conditional expression
 
     def __init__ (self,e1,e2,e3):
-        print e1, e2, e3
         self._cond = e1
         self._then = e2
         self._else = e3
@@ -387,20 +386,22 @@ def parse_natural (input):
     # <expr> ::= <integer>
     #            <boolean>
     #            <identifier>
+    #            <math>
     #            ( <expr> )
     #            <boolean> <cond_rest>
     #            let ( <bindings> ) <expr>
-    #            <integer> <plus_rest>
-    #            <integer> <times_rest>
-    #            <integer> <sub_rest>
     #            <name> ( <expr-seq> )
 
-    # <boolean> :: true
-    #              false
+    # <math> ::= <plus>
+    #            <minus>
+    #            <math_expandable>
+    # <math_expandable> ::= <times>
+    #                       <math_nonexpandable>
+    # <math_nonexpandable> ::= ( <math> )
+    #                          <integer>
+    # <plus> ::= <math_expandable> + <math>
+    # <minus> ::= <math_expandable> - <math>
 
-    # <plus_rest> ::= + <expr>
-    # <times_rest> :: * <expr>
-    # <sub_rest> :: - <expr>
     # <cond_rest> :: ? <expr> : <expr>
 
     # <bindings> ::= <name> = <expr>, bindings
@@ -408,6 +409,13 @@ def parse_natural (input):
 
     # <expr_seq> ::= <expr>, <expr_seq>
     #                <expr>
+
+    pEXPR = Forward()
+    pPARENEXPR = Forward()
+    pUSERFUNC = Forward()
+    pMATH = Forward()
+    pMATHEXPANDABLE = Forward()
+    pMATHNONEXPANDABLE = Forward()
 
     idChars = alphas+"_+*-?!=<>"
 
@@ -423,43 +431,33 @@ def parse_natural (input):
     pBOOLEAN = Keyword("true") | Keyword("false")
     pBOOLEAN.setParseAction(lambda result: EBoolean(result[0]=="true"))
 
-    pEXPR = Forward()
-    pPLUS = Forward()
-    pTIMES = Forward()
-    pSUB = Forward()
-    pPARENS = Forward()
-    pUSERFUNC = Forward()
-
     pCONDREST = Keyword("?") + pEXPR + Keyword(":") + pEXPR
     pCONDREST.setParseAction(lambda result: {"e1": result[1], "e2": result[3]})
 
-    pBOOLEANRESULT = (pBOOLEAN | pPARENS | pUSERFUNC)
+    pBOOLEANRESULT = (pBOOLEAN | pPARENEXPR | pUSERFUNC)
     pIF = pBOOLEANRESULT + pCONDREST
     pIF.setParseAction(lambda result: EIf(result[0],result[1]["e1"],result[1]["e2"]))
 
-    pPARENS << "(" + pEXPR + ")"
-    pPARENS.setParseAction(lambda result: result[1])
+    pPARENEXPR << "(" + pEXPR + ")"
+    pPARENEXPR.setParseAction(lambda result: result[1])
 
-    #pINTEGERRESULT = (pPARENS | pIDENTIFIER | pINTEGER | pPLUS | pTIMES | pSUB)
-    pINTEGERRESULT = (pPARENS | pIDENTIFIER | pINTEGER | pSUB)
+    pPLUS = pMATHEXPANDABLE + Keyword("+") + pMATH
+    pPLUS.setParseAction(lambda result: ECall("+", [result[0], result[2]]))
 
-    pPLUSREST = Keyword("+") + pEXPR
-    pPLUSREST.setParseAction(lambda result: result[1])
+    pMINUS = pMATHEXPANDABLE + Keyword("-") + pMATH
+    pMINUS.setParseAction(lambda result: ECall("-", [result[0], result[2]]))
 
-    pPLUS << pINTEGERRESULT + pPLUSREST
-    pPLUS.setParseAction(lambda result: ECall("+", [result[0], result[1]]))
+    pTIMES = pMATHNONEXPANDABLE + Keyword("*") + pMATHEXPANDABLE
+    pTIMES.setParseAction(lambda result: ECall("*", [result[0], result[2]]))
 
-    pTIMESREST = Keyword("*") + pEXPR
-    pTIMESREST.setParseAction(lambda result: result[1])
+    pPARENMATH = "(" + pMATH + ")"
+    pPARENMATH.setParseAction(lambda result: result[1])
 
-    pTIMES << pINTEGERRESULT + pTIMESREST
-    pTIMES.setParseAction(lambda result: ECall("*", [result[0], result[1]]))
+    pMATH << (pPLUS | pMINUS | pMATHEXPANDABLE)
 
-    pSUBREST = Keyword("-") + pEXPR
-    pSUBREST.setParseAction(lambda result: result[1])
+    pMATHEXPANDABLE << (pTIMES | pMATHNONEXPANDABLE)
 
-    pSUB << pINTEGERRESULT + pSUBREST
-    pSUB.setParseAction(lambda result: ECall("-", [result[0], result[1]]))
+    pMATHNONEXPANDABLE << (pPARENMATH | pINTEGER | pIF | pIDENTIFIER)
 
     pBINDING = pNAME + Keyword("=") + pEXPR
     pBINDING.setParseAction(lambda result: (result[0],result[2]))
@@ -467,12 +465,12 @@ def parse_natural (input):
     pLET = Keyword("let") + "(" + delimitedList(pBINDING) + ")" + pEXPR
     pLET.setParseAction(lambda result: ELet(result[2:len(result)-2],result[len(result)-1]))
 
-    pFUNCPARAM = (pIF | pSUB | pBOOLEAN | pINTEGER | pUSERFUNC | pIDENTIFIER)  # should maybe allow times/plus/sub
+    pFUNCPARAM = (pIF | pMATH | pBOOLEAN | pINTEGER | pUSERFUNC | pIDENTIFIER)  # should maybe allow times/plus/sub
 
     pUSERFUNC << pNAME + "(" + delimitedList(pFUNCPARAM) + ")"
     pUSERFUNC.setParseAction(lambda result: ECall(result[0],result[2:len(result)-1]))
 
-    pEXPR << (pIF | pBOOLEAN | pTIMES | pPLUS | pSUB | pPARENS | pINTEGER | pLET | pUSERFUNC | pIDENTIFIER)
+    pEXPR << (pIF | pBOOLEAN | pLET | pUSERFUNC | pMATH | pIDENTIFIER | pINTEGER | pPARENEXPR)
 
     result = pEXPR.parseString(input)[0]
     return result    # the first element of the result is the expression
@@ -508,11 +506,11 @@ def shell_natural ():
         inp = raw_input("calc/nat> ")
         if not inp:
             return
-        print inp
         exp = parse_natural(inp)
         print "Abstract representation:", exp
         v = exp.eval(INITIAL_FUN_DICT)
         print v
+
 
 # increase stack size to let us call recursive functions quasi comfortably
 sys.setrecursionlimit(10000)

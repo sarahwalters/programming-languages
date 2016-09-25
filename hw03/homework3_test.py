@@ -74,6 +74,27 @@ class TestStringMethods (unittest.TestCase):
         EDef(name, params, body).eval(FUN_DICT)
         self.assertEqual(parse(inp2)['expr'].eval(FUN_DICT).value, 9)
 
+    def test_parseNatural(self):
+        inp1 = "let (x = 10) x + 1"
+        inp2 = "let (x = 10 , y = 20) x + y * y"
+        inp3 = "zero? (1)"
+        inp4 = "zero? (10 - 10)"
+        inp5 = "zero? (0) ? 1 : 2"
+        inp6 = "(zero? (0) ? 1 : 2) + 55"
+        inp7 = "(zero? (1) ? 1 : 2) + 55"
+        inp8 = "let (x = 4 + 5 * 6) let (y = x * 2) square(y)"
+        inp9 = "(34 * 2) * (34 * 2)"
+
+        self.assertEqual(parse_natural(inp1).eval(INITIAL_FUN_DICT).value, 11)
+        self.assertEqual(parse_natural(inp2).eval(INITIAL_FUN_DICT).value, 410)
+        self.assertEqual(parse_natural(inp3).eval(INITIAL_FUN_DICT).value, False)
+        self.assertEqual(parse_natural(inp4).eval(INITIAL_FUN_DICT).value, True)
+        self.assertEqual(parse_natural(inp5).eval(INITIAL_FUN_DICT).value, 1)
+        self.assertEqual(parse_natural(inp6).eval(INITIAL_FUN_DICT).value, 56)
+        self.assertEqual(parse_natural(inp7).eval(INITIAL_FUN_DICT).value, 57)
+        self.assertEqual(parse_natural(inp8).eval(INITIAL_FUN_DICT).value, 4624)
+        self.assertEqual(parse_natural(inp9).eval(INITIAL_FUN_DICT).value, 4624)
+
 
 if __name__ == '__main__':
     unittest.main()
