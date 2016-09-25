@@ -9,11 +9,11 @@ class TestStringMethods (unittest.TestCase):
         inp4 = "(let ((a 10)) (let ((sq (* a a)) (db (+ a a))) (+ sq db)))"
         inp5 = "(let ((x 10) (y 20) (z 30)) (+ x (* y z)))"
 
-        self.assertEqual(parse(inp1).eval(INITIAL_FUN_DICT).value, 30)
-        self.assertEqual(parse(inp2).eval(INITIAL_FUN_DICT).value, 2)
-        self.assertEqual(parse(inp3).eval(INITIAL_FUN_DICT).value, 6)
-        self.assertEqual(parse(inp4).eval(INITIAL_FUN_DICT).value, 120)
-        self.assertEqual(parse(inp5).eval(INITIAL_FUN_DICT).value, 610)
+        self.assertEqual(parse(inp1)['expr'].eval(FUN_DICT).value, 30)
+        self.assertEqual(parse(inp2)['expr'].eval(FUN_DICT).value, 2)
+        self.assertEqual(parse(inp3)['expr'].eval(FUN_DICT).value, 6)
+        self.assertEqual(parse(inp4)['expr'].eval(FUN_DICT).value, 120)
+        self.assertEqual(parse(inp5)['expr'].eval(FUN_DICT).value, 610)
 
     def test_parseUserFunc(self):
         inp1 = "(zero? 0)"
@@ -26,33 +26,53 @@ class TestStringMethods (unittest.TestCase):
         inp8 = "(- 30 (- 20 15))"
         inp9 = "(+1 (if (zero? 0) 10 20))"
 
-        self.assertEqual(parse(inp1).eval(INITIAL_FUN_DICT).value, True)
-        self.assertEqual(parse(inp2).eval(INITIAL_FUN_DICT).value, False)
-        self.assertEqual(parse(inp3).eval(INITIAL_FUN_DICT).value, False)
-        self.assertEqual(parse(inp4).eval(INITIAL_FUN_DICT).value, True)
-        self.assertEqual(parse(inp5).eval(INITIAL_FUN_DICT).value, 11)
-        self.assertEqual(parse(inp6).eval(INITIAL_FUN_DICT).value, 1)
-        self.assertEqual(parse(inp7).eval(INITIAL_FUN_DICT).value, 2)
-        self.assertEqual(parse(inp8).eval(INITIAL_FUN_DICT).value, 25)
-        self.assertEqual(parse(inp9).eval(INITIAL_FUN_DICT).value, 11)
+        self.assertEqual(parse(inp1)['expr'].eval(FUN_DICT).value, True)
+        self.assertEqual(parse(inp2)['expr'].eval(FUN_DICT).value, False)
+        self.assertEqual(parse(inp3)['expr'].eval(FUN_DICT).value, False)
+        self.assertEqual(parse(inp4)['expr'].eval(FUN_DICT).value, True)
+        self.assertEqual(parse(inp5)['expr'].eval(FUN_DICT).value, 11)
+        self.assertEqual(parse(inp6)['expr'].eval(FUN_DICT).value, 1)
+        self.assertEqual(parse(inp7)['expr'].eval(FUN_DICT).value, 2)
+        self.assertEqual(parse(inp8)['expr'].eval(FUN_DICT).value, 25)
+        self.assertEqual(parse(inp9)['expr'].eval(FUN_DICT).value, 11)
 
     def test_parsePlus(self):
         inp1 = "(+ 1 2)"
         inp2 = "(+ 1 2 3)"
         inp3 = "(+ 1 2 3 4 5)"
 
-        self.assertEqual(parse(inp1).eval(INITIAL_FUN_DICT).value, 3)
-        self.assertEqual(parse(inp2).eval(INITIAL_FUN_DICT).value, 6)
-        self.assertEqual(parse(inp3).eval(INITIAL_FUN_DICT).value, 15)
+        self.assertEqual(parse(inp1)['expr'].eval(FUN_DICT).value, 3)
+        self.assertEqual(parse(inp2)['expr'].eval(FUN_DICT).value, 6)
+        self.assertEqual(parse(inp3)['expr'].eval(FUN_DICT).value, 15)
 
     def test_parseTimes(self):
         inp1 = "(* 1 2)"
         inp2 = "(* 1 2 3)"
         inp3 = "(* 1 2 3 4)"
 
-        self.assertEqual(parse(inp1).eval(INITIAL_FUN_DICT).value, 2)
-        self.assertEqual(parse(inp2).eval(INITIAL_FUN_DICT).value, 6)
-        self.assertEqual(parse(inp3).eval(INITIAL_FUN_DICT).value, 24)
+        self.assertEqual(parse(inp1)['expr'].eval(FUN_DICT).value, 2)
+        self.assertEqual(parse(inp2)['expr'].eval(FUN_DICT).value, 6)
+        self.assertEqual(parse(inp3)['expr'].eval(FUN_DICT).value, 24)
+
+    def test_parseDef(self):
+        decrement = "(defun decrement (x) (- x 1))"
+        decr2 = "(defun decr2 (x) (decrement (decrement x)))"
+        inp1 = "(decrement 123)"
+        inp2 = "(decr2 11)"
+
+        res = parse(decrement)
+        name = res['name']
+        params = res['params']
+        body = res['body']
+        EDef(name, params, body).eval(FUN_DICT)
+        self.assertEqual(parse(inp1)['expr'].eval(FUN_DICT).value, 122)
+
+        res = parse(decr2)
+        name = res['name']
+        params = res['params']
+        body = res['body']
+        EDef(name, params, body).eval(FUN_DICT)
+        self.assertEqual(parse(inp2)['expr'].eval(FUN_DICT).value, 9)
 
 
 if __name__ == '__main__':

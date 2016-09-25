@@ -8,7 +8,6 @@
 # Remarks:
 #
 
-
 import sys
 from pyparsing import Word, Literal,  Keyword, Forward, alphas, alphanums, OneOrMore
 
@@ -241,8 +240,7 @@ def oper_zero (v1):
 
 
 # Initial primitives dictionary
-
-INITIAL_FUN_DICT = {
+FUN_DICT = {
     "+": {"params":["x","y"],
           "body":EPrimCall(oper_plus,[EId("x"),EId("y")])},
     "-": {"params":["x","y"],
@@ -264,6 +262,31 @@ INITIAL_FUN_DICT = {
                                           ECall("sum_from_to",[ECall("+1",[EId("s")]),
                                                                EId("e")])]))}
 }
+
+class EDef (Exp):
+
+    def __init__ (self, e1, e2, e3):
+        self._name = e1
+        self._params= e2
+        self._body= e3
+
+    def __str__ (self):
+        return "EDef({},{},{})".format(self._name,self._params,self._body)
+
+    def eval (self,fun_dict):
+        if type(self._params) is str:
+            FUN_DICT[self._name] = {
+                "params": [self._params],
+                "body": self._body
+            }
+        elif type(self._params) is list:
+            if all([isinstance(x, str) for x in self._params]):
+                FUN_DICT[self._name] = {
+                    "params": self._params,
+                    "body": self._body
+                }
+            else:
+                raise Exception ("params should be a list")
 
 
 
@@ -325,8 +348,27 @@ def parse (input):
 
     pEXPR << (pINTEGER | pBOOLEAN | pIDENTIFIER | pIF | pLET | pPLUS | pTIMES | pUSERFUNC)
 
-    result = pEXPR.parseString(input)[0]
-    return result    # the first element of the result is the expression
+    pPARAMS = OneOrMore(Word(idChars, idChars+"0123456789"))("params")
+    pNAME = Word(idChars, idChars+"0123456789")("name")
+
+    pDEF = "(" + Keyword("defun") + pNAME + "(" + pPARAMS + ")" + pEXPR("body") + ")"
+
+    if pDEF.matches(input):
+        res = pDEF.parseString(input)
+        return {
+            'result': "function",
+            'name': res["name"],
+            'params': res["params"].asList(),
+            'body': res["body"],
+        }
+    elif pEXPR.matches(input):
+        res = pEXPR.parseString(input)[0]
+        return {
+            'result': "expression",
+            'expr': res,
+        }
+    else:
+        raise Exception("PARSING ERROR: UNABLE TO PARSE")
 
 
 def recursiveExpand(operation, args):
@@ -345,10 +387,16 @@ def shell ():
         inp = raw_input("calc> ")
         if not inp:
             return
-        exp = parse(inp)
-        print "Abstract representation:", exp
-        v = exp.eval(INITIAL_FUN_DICT)
-        print v
+        res = parse(inp)
+        if res['result'] == "expression":
+            v = res['expr'].eval(FUN_DICT)
+            print v
+        else:
+            name = res['name']
+            params = res['params']
+            body = res['body']
+            EDef(name, params, body).eval(FUN_DICT)
+            print(name + " added to functions")
 
 # increase stack size to let us call recursive functions quasi comfortably
 sys.setrecursionlimit(10000)
