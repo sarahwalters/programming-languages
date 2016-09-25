@@ -93,6 +93,7 @@ class EIf (Exp):
     # Conditional expression
 
     def __init__ (self,e1,e2,e3):
+        print e1, e2, e3
         self._cond = e1
         self._then = e2
         self._else = e3
@@ -378,6 +379,91 @@ def recursiveExpand(operation, args):
         return ECall(operation, [args[0], recursiveExpand(operation, args[1:])])
 
 
+def parse_natural (input):
+    # parse a string into an element of the abstract representation
+
+    # Grammar:
+
+    # <expr> ::= <integer>
+    #            <boolean>
+    #            <identifier>
+    #            ( <expr> )
+    #            <boolean> <cond_rest>
+    #            let ( <bindings> ) <expr>
+    #            <integer> <plus_rest>
+    #            <integer> <times_rest>
+    #            <integer> <sub_rest>
+    #            <name> ( <expr-seq> )
+
+    # <boolean> :: true
+    #              false
+
+    # <plus_rest> ::= + <expr>
+    # <times_rest> :: * <expr>
+    # <sub_rest> :: - <expr>
+    # <cond_rest> :: ? <expr> : <expr>
+
+    # <bindings> ::= <name> = <expr>, bindings
+    #                <name> = <expr>
+
+    # <expr_seq> ::= <expr>, <expr_seq>
+    #                <expr>
+
+    idChars = alphas+"_+*-?!=<>"
+
+    pIDENTIFIER = Word(idChars, idChars+"0123456789")
+    pIDENTIFIER.setParseAction(lambda result: EId(result[0]))
+
+    # A name is like an identifier but it does not return an EId...
+    pNAME = Word(idChars,idChars+"0123456789")
+
+    pINTEGER = Word("-0123456789","0123456789")
+    pINTEGER.setParseAction(lambda result: EInteger(int(result[0])))
+
+    pBOOLEAN = Keyword("true") | Keyword("false")
+    pBOOLEAN.setParseAction(lambda result: EBoolean(result[0]=="true"))
+
+    pEXPR = Forward()
+
+    pCONDREST = Keyword("?") + pEXPR + Keyword(":") + pEXPR
+    pCONDREST.setParseAction(lambda result: {"e1": result[1], "e2": result[3]})
+
+    pIF = pBOOLEAN + pCONDREST
+    pIF.setParseAction(lambda result: EIf(result[0],result[1]["e1"],result[1]["e2"]))
+
+    pPLUSREST = Keyword("+") + pEXPR
+    pPLUSREST.setParseAction(lambda result: result[1])
+
+    pPLUS = pINTEGER + pPLUSREST
+    pPLUS.setParseAction(lambda result: ECall("+", [result[0], result[1]]))
+
+    pTIMESREST = Keyword("*") + pEXPR
+    pTIMESREST.setParseAction(lambda result: result[1])
+
+    pTIMES = pINTEGER + pTIMESREST
+    pTIMES.setParseAction(lambda result: ECall("*", [result[0], result[1]]))
+
+    pSUBREST = Keyword("-") + pEXPR
+    pSUBREST.setParseAction(lambda result: result[1])
+
+    pSUB = pINTEGER + pSUBREST
+    pSUB.setParseAction(lambda result: ECall("-", [result[0], result[1]]))
+
+    pPARENS = "(" + pEXPR + ")"
+    pPARENS.setParseAction(lambda result: result[1])
+
+    pBINDING = pNAME + Keyword("=") + pEXPR
+    pBINDING.setParseAction(lambda result: (result[0],result[2]))
+
+    pLET = Keyword("let") + "(" + pBINDING + ")" + pEXPR
+    pLET.setParseAction(lambda result: ELet([result[2]],result[4]))
+
+    pEXPR << (pPARENS | pTIMES | pPLUS | pSUB | pIF | pINTEGER | pBOOLEAN | pLET | pIDENTIFIER)
+
+    result = pEXPR.parseString(input)[0]
+    return result    # the first element of the result is the expression
+
+
 def shell ():
     # A simple shell
     # Repeatedly read a line of input, parse it, and evaluate the result
@@ -398,5 +484,23 @@ def shell ():
             EDef(name, params, body).eval(FUN_DICT)
             print(name + " added to functions")
 
+
+def shell_natural ():
+    # A simple shell with natural syntax
+    # Repeatedly read a line of input, parse it, and evaluate the result
+
+    print "Homework 3 - Natural Calc Language"
+    while True:
+        inp = raw_input("calc/nat> ")
+        if not inp:
+            return
+        exp = parse_natural(inp)
+        print "Abstract representation:", exp
+        v = exp.eval(INITIAL_FUN_DICT)
+        print v
+
 # increase stack size to let us call recursive functions quasi comfortably
 sys.setrecursionlimit(10000)
+
+if __name__ == "__main__":
+    shell_natural()
