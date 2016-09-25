@@ -10,7 +10,7 @@
 
 
 import sys
-from pyparsing import Word, Literal,  Keyword, Forward, alphas, alphanums
+from pyparsing import Word, Literal,  Keyword, Forward, alphas, alphanums, OneOrMore
 
 
 #
@@ -311,8 +311,8 @@ def parse (input):
     pBINDING = "(" + pNAME + pEXPR + ")"
     pBINDING.setParseAction(lambda result: (result[1],result[2]))
 
-    pLET = "(" + Keyword("let") + "(" + pBINDING + ")" + pEXPR + ")"
-    pLET.setParseAction(lambda result: ELet([result[3]],result[5]))
+    pLET = "(" + Keyword("let") + "(" + OneOrMore(pBINDING) + ")" + pEXPR + ")"
+    pLET.setParseAction(lambda result: ELet(result[3:len(result)-3],result[len(result)-2]))
 
     pPLUS = "(" + Keyword("+") + pEXPR + pEXPR + ")"
     pPLUS.setParseAction(lambda result: ECall("+",[result[2],result[3]]))
@@ -344,3 +344,10 @@ def shell ():
 sys.setrecursionlimit(10000)
 
 
+if __name__ == "__main__":
+    test = "(let ((a 1) (b 2) (c 3) (d 4) (e 5) (f 6)) f)"
+    test2 = "(let ((a (let ((x 1) (y 2)) x)) (b (let ((x 1) (y 2)) y))) (let ((b a) (a b)) a))"
+    exp = parse(test)
+    print "Abstract representation:", exp
+    v = exp.eval(INITIAL_FUN_DICT)
+    print v
