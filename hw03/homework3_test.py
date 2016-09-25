@@ -91,21 +91,21 @@ class TestStringMethods (unittest.TestCase):
         inp14 = "sum_from_to (1, 10)"
         inp15 = "let (x = 10) let (y = x * x) y"
 
-        self.assertEqual(parse_natural(inp1).eval(INITIAL_FUN_DICT).value, 11)
-        self.assertEqual(parse_natural(inp2).eval(INITIAL_FUN_DICT).value, 410)
-        self.assertEqual(parse_natural(inp3).eval(INITIAL_FUN_DICT).value, False)
-        self.assertEqual(parse_natural(inp4).eval(INITIAL_FUN_DICT).value, True)
-        self.assertEqual(parse_natural(inp5).eval(INITIAL_FUN_DICT).value, 1)
-        self.assertEqual(parse_natural(inp6).eval(INITIAL_FUN_DICT).value, 56)
-        self.assertEqual(parse_natural(inp7).eval(INITIAL_FUN_DICT).value, 57)
-        self.assertEqual(parse_natural(inp8).eval(INITIAL_FUN_DICT).value, 4624)
-        self.assertEqual(parse_natural(inp9).eval(INITIAL_FUN_DICT).value, 4624)
-        self.assertEqual(parse_natural(inp10).eval(INITIAL_FUN_DICT).value, 31)
-        self.assertEqual(parse_natural(inp11).eval(INITIAL_FUN_DICT).value, 42)
-        self.assertEqual(parse_natural(inp12).eval(INITIAL_FUN_DICT).value, 230)
-        self.assertEqual(parse_natural(inp13).eval(INITIAL_FUN_DICT).value, 10)
-        self.assertEqual(parse_natural(inp14).eval(INITIAL_FUN_DICT).value, 55)
-        self.assertEqual(parse_natural(inp15).eval(INITIAL_FUN_DICT).value, 100)
+        self.assertEqual(parse_natural(inp1)['expr'].eval(FUN_DICT).value, 11)
+        self.assertEqual(parse_natural(inp2)['expr'].eval(FUN_DICT).value, 410)
+        self.assertEqual(parse_natural(inp3)['expr'].eval(FUN_DICT).value, False)
+        self.assertEqual(parse_natural(inp4)['expr'].eval(FUN_DICT).value, True)
+        self.assertEqual(parse_natural(inp5)['expr'].eval(FUN_DICT).value, 1)
+        self.assertEqual(parse_natural(inp6)['expr'].eval(FUN_DICT).value, 56)
+        self.assertEqual(parse_natural(inp7)['expr'].eval(FUN_DICT).value, 57)
+        self.assertEqual(parse_natural(inp8)['expr'].eval(FUN_DICT).value, 4624)
+        self.assertEqual(parse_natural(inp9)['expr'].eval(FUN_DICT).value, 4624)
+        self.assertEqual(parse_natural(inp10)['expr'].eval(FUN_DICT).value, 31)
+        self.assertEqual(parse_natural(inp11)['expr'].eval(FUN_DICT).value, 42)
+        self.assertEqual(parse_natural(inp12)['expr'].eval(FUN_DICT).value, 230)
+        self.assertEqual(parse_natural(inp13)['expr'].eval(FUN_DICT).value, 10)
+        self.assertEqual(parse_natural(inp14)['expr'].eval(FUN_DICT).value, 55)
+        self.assertEqual(parse_natural(inp15)['expr'].eval(FUN_DICT).value, 100)
 
 
 if __name__ == '__main__':

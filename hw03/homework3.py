@@ -9,7 +9,7 @@
 #
 
 import sys
-from pyparsing import Word, Literal, Keyword, Forward, alphas, alphanums, OneOrMore, delimitedList
+from pyparsing import Word, Literal, Keyword, Forward, alphas, alphanums, OneOrMore, delimitedList, Group
 
 
 #
@@ -320,6 +320,8 @@ def parse (input):
     # A name is like an identifier but it does not return an EId...
     pNAME = Word(idChars,idChars+"0123456789")
 
+    pPARAMS = OneOrMore(Word(idChars, idChars+"0123456789"))
+
     pINTEGER = Word("-0123456789","0123456789")
     pINTEGER.setParseAction(lambda result: EInteger(int(result[0])))
 
@@ -328,30 +330,27 @@ def parse (input):
 
     pEXPR = Forward()
 
-    pIF = "(" + Keyword("if") + pEXPR + pEXPR + pEXPR + ")"
-    pIF.setParseAction(lambda result: EIf(result[2],result[3],result[4]))
+    pIF = "(" + Keyword("if") + pEXPR("e1") + pEXPR("e2") + pEXPR("e3") + ")"
+    pIF.setParseAction(lambda result: EIf(result["e1"], result["e2"], result["e3"]))
 
-    pBINDING = "(" + pNAME + pEXPR + ")"
-    pBINDING.setParseAction(lambda result: (result[1],result[2]))
+    pBINDING = "(" + pNAME("name") + pEXPR("exp") + ")"
+    pBINDING.setParseAction(lambda result: (result["name"], result["exp"]))
 
-    pLET = "(" + Keyword("let") + "(" + OneOrMore(pBINDING) + ")" + pEXPR + ")"
-    pLET.setParseAction(lambda result: ELet(result[3:len(result)-3],result[len(result)-2]))
+    pLET = "(" + Keyword("let") + "(" + OneOrMore(pBINDING)("bindings") + ")" + pEXPR("exp") + ")"
+    pLET.setParseAction(lambda result: ELet(result["bindings"], result["exp"]))
 
-    pPLUS = "(" + Keyword("+") + pEXPR + OneOrMore(pEXPR) + ")"
-    pPLUS.setParseAction(lambda result: recursiveExpand("+",result[2:len(result)-1]))
+    pPLUS = "(" + Keyword("+") + Group(pEXPR + OneOrMore(pEXPR))("exps") + ")"
+    pPLUS.setParseAction(lambda result: recursiveExpand("+", result["exps"]))
 
-    pTIMES = "(" + Keyword("*") + pEXPR + OneOrMore(pEXPR) + ")"
-    pTIMES.setParseAction(lambda result: recursiveExpand("*",result[2:len(result)-1]))
+    pTIMES = "(" + Keyword("*") + Group(pEXPR + OneOrMore(pEXPR))("exps") + ")"
+    pTIMES.setParseAction(lambda result: recursiveExpand("*", result["exps"]))
 
-    pUSERFUNC = "(" + pNAME + OneOrMore(pEXPR) + ")"
-    pUSERFUNC.setParseAction(lambda result: ECall(result[1],result[2:len(result)-1]))
+    pUSERFUNC = "(" + pNAME("name") + OneOrMore(pEXPR)("params") + ")"
+    pUSERFUNC.setParseAction(lambda result: ECall(result["name"], result["params"]))
 
     pEXPR << (pINTEGER | pBOOLEAN | pIDENTIFIER | pIF | pLET | pPLUS | pTIMES | pUSERFUNC)
 
-    pPARAMS = OneOrMore(Word(idChars, idChars+"0123456789"))("params")
-    pNAME = Word(idChars, idChars+"0123456789")("name")
-
-    pDEF = "(" + Keyword("defun") + pNAME + "(" + pPARAMS + ")" + pEXPR("body") + ")"
+    pDEF = "(" + Keyword("defun") + pNAME("name") + "(" + pPARAMS("params") + ")" + pEXPR("body") + ")"
 
     if pDEF.matches(input):
         res = pDEF.parseString(input)
@@ -432,27 +431,27 @@ def parse_natural (input):
     pBOOLEAN = Keyword("true") | Keyword("false")
     pBOOLEAN.setParseAction(lambda result: EBoolean(result[0]=="true"))
 
-    pCONDREST = Keyword("?") + pEXPR + Keyword(":") + pEXPR
-    pCONDREST.setParseAction(lambda result: {"e1": result[1], "e2": result[3]})
+    pCONDREST = Keyword("?") + pEXPR("e1") + Keyword(":") + pEXPR("e2")
+    pCONDREST.setParseAction(lambda result: {"e1": result["e1"], "e2": result["e2"]})
 
     pBOOLEANRESULT = (pBOOLEAN | pPARENEXPR | pUSERFUNC)
-    pIF = pBOOLEANRESULT + pCONDREST
-    pIF.setParseAction(lambda result: EIf(result[0],result[1]["e1"],result[1]["e2"]))
+    pIF = pBOOLEANRESULT("condition") + pCONDREST("exps")
+    pIF.setParseAction(lambda result: EIf(result["condition"], result["exps"]["e1"], result["exps"]["e2"]))
 
-    pPARENEXPR << "(" + pEXPR + ")"
-    pPARENEXPR.setParseAction(lambda result: result[1])
+    pPARENEXPR << "(" + pEXPR("exp") + ")"
+    pPARENEXPR.setParseAction(lambda result: result["exp"])
 
-    pPLUS = pMATHEXPANDABLE + Keyword("+") + pMATH
-    pPLUS.setParseAction(lambda result: ECall("+", [result[0], result[2]]))
+    pPLUS = pMATHEXPANDABLE("math1") + Keyword("+") + pMATH("math2")
+    pPLUS.setParseAction(lambda result: ECall("+", [result["math1"], result["math2"]]))
 
-    pMINUS = pMATHEXPANDABLE + Keyword("-") + pMATH
-    pMINUS.setParseAction(lambda result: ECall("-", [result[0], result[2]]))
+    pMINUS = pMATHEXPANDABLE("math1") + Keyword("-") + pMATH("math2")
+    pMINUS.setParseAction(lambda result: ECall("-", [result["math1"], result["math2"]]))
 
-    pTIMES = pMATHNONEXPANDABLE + Keyword("*") + pMATHEXPANDABLE
-    pTIMES.setParseAction(lambda result: ECall("*", [result[0], result[2]]))
+    pTIMES = pMATHNONEXPANDABLE("math1") + Keyword("*") + pMATHEXPANDABLE("math2")
+    pTIMES.setParseAction(lambda result: ECall("*", [result["math1"], result["math2"]]))
 
-    pPARENMATH = "(" + pMATH + ")"
-    pPARENMATH.setParseAction(lambda result: result[1])
+    pPARENMATH = "(" + pMATH("math") + ")"
+    pPARENMATH.setParseAction(lambda result: result["math"])
 
     pMATH << (pPLUS | pMINUS | pMATHEXPANDABLE)
 
@@ -460,21 +459,27 @@ def parse_natural (input):
 
     pMATHNONEXPANDABLE << (pPARENMATH | pINTEGER | pIF | pIDENTIFIER)
 
-    pBINDING = pNAME + Keyword("=") + pEXPR
-    pBINDING.setParseAction(lambda result: (result[0],result[2]))
+    pBINDING = pNAME("name") + Keyword("=") + pEXPR("exp")
+    pBINDING.setParseAction(lambda result: (result["name"], result["exp"]))
 
-    pLET = Keyword("let") + "(" + delimitedList(pBINDING) + ")" + pEXPR
-    pLET.setParseAction(lambda result: ELet(result[2:len(result)-2],result[len(result)-1]))
+    pLET = Keyword("let") + "(" + delimitedList(pBINDING)("bindings") + ")" + pEXPR("exp")
+    pLET.setParseAction(lambda result: ELet(result["bindings"], result["exp"]))
 
     pFUNCPARAM = (pIF | pMATH | pBOOLEAN | pINTEGER | pUSERFUNC | pIDENTIFIER)  # should maybe allow times/plus/sub
 
-    pUSERFUNC << pNAME + "(" + delimitedList(pFUNCPARAM) + ")"
-    pUSERFUNC.setParseAction(lambda result: ECall(result[0],result[2:len(result)-1]))
+    pUSERFUNC << pNAME("name") + "(" + delimitedList(pFUNCPARAM)("params") + ")"
+    pUSERFUNC.setParseAction(lambda result: ECall(result["name"], result["params"]))
 
     pEXPR << (pIF | pBOOLEAN | pLET | pUSERFUNC | pMATH | pIDENTIFIER | pINTEGER | pPARENEXPR)
 
-    result = pEXPR.parseString(input)[0]
-    return result    # the first element of the result is the expression
+    if pEXPR.matches(input):
+        res = pEXPR.parseString(input)[0] # the first element of the result is the expression
+        return {
+            'result': "expression",
+            'expr': res,
+        }
+    else:
+        raise Exception("PARSING ERROR: UNABLE TO PARSE")
 
 
 def shell ():
