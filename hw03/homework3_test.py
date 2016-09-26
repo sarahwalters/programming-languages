@@ -90,6 +90,9 @@ class TestStringMethods (unittest.TestCase):
         inp13 = "let (x = 10, y = 20) (zero? (x - y) ? x * x : x)"
         inp14 = "sum_from_to (1, 10)"
         inp15 = "let (x = 10) let (y = x * x) y"
+        inp16 = "square(3) + square(4)"
+        inp17 = "1 + square(4)"
+        inp18 = "square(3) + 1"
 
         self.assertEqual(parse_natural(inp1)['expr'].eval(FUN_DICT).value, 11)
         self.assertEqual(parse_natural(inp2)['expr'].eval(FUN_DICT).value, 410)
@@ -106,6 +109,9 @@ class TestStringMethods (unittest.TestCase):
         self.assertEqual(parse_natural(inp13)['expr'].eval(FUN_DICT).value, 10)
         self.assertEqual(parse_natural(inp14)['expr'].eval(FUN_DICT).value, 55)
         self.assertEqual(parse_natural(inp15)['expr'].eval(FUN_DICT).value, 100)
+        self.assertEqual(parse_natural(inp16)['expr'].eval(FUN_DICT).value, 25)
+        self.assertEqual(parse_natural(inp17)['expr'].eval(FUN_DICT).value, 17)
+        self.assertEqual(parse_natural(inp18)['expr'].eval(FUN_DICT).value, 10)
 
 
 if __name__ == '__main__':

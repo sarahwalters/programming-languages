@@ -457,7 +457,7 @@ def parse_natural (input):
 
     pMATHEXPANDABLE << (pTIMES | pMATHNONEXPANDABLE)
 
-    pMATHNONEXPANDABLE << (pPARENMATH | pINTEGER | pIF | pIDENTIFIER)
+    pMATHNONEXPANDABLE << (pPARENMATH | pINTEGER | pIF | pUSERFUNC | pIDENTIFIER)
 
     pBINDING = pNAME("name") + Keyword("=") + pEXPR("exp")
     pBINDING.setParseAction(lambda result: (result["name"], result["exp"]))
@@ -465,12 +465,12 @@ def parse_natural (input):
     pLET = Keyword("let") + "(" + delimitedList(pBINDING)("bindings") + ")" + pEXPR("exp")
     pLET.setParseAction(lambda result: ELet(result["bindings"], result["exp"]))
 
-    pFUNCPARAM = (pIF | pMATH | pBOOLEAN | pINTEGER | pUSERFUNC | pIDENTIFIER)  # should maybe allow times/plus/sub
+    pFUNCPARAM = (pIF | pMATH | pBOOLEAN | pINTEGER | pUSERFUNC | pIDENTIFIER)
 
     pUSERFUNC << pNAME("name") + "(" + delimitedList(pFUNCPARAM)("params") + ")"
     pUSERFUNC.setParseAction(lambda result: ECall(result["name"], result["params"]))
 
-    pEXPR << (pIF | pBOOLEAN | pLET | pUSERFUNC | pMATH | pIDENTIFIER | pINTEGER | pPARENEXPR)
+    pEXPR << (pIF | pBOOLEAN | pLET | pMATH | pUSERFUNC | pIDENTIFIER | pINTEGER | pPARENEXPR)
 
     if pEXPR.matches(input):
         res = pEXPR.parseString(input)[0] # the first element of the result is the expression
@@ -512,9 +512,9 @@ def shell_natural ():
         inp = raw_input("calc/nat> ")
         if not inp:
             return
-        exp = parse_natural(inp)
-        print "Abstract representation:", exp
-        v = exp.eval(INITIAL_FUN_DICT)
+        res = parse_natural(inp)
+        print "Abstract representation:", res["expr"]
+        v = res["expr"].eval(FUN_DICT)
         print v
 
 
