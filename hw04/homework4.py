@@ -6,7 +6,7 @@
 # Emails:
 #
 # Remarks:
-#
+# TODO fix conflicts b/w variable x and function param x
 
 
 import sys
@@ -160,14 +160,21 @@ class ELet (Exp):
         return new_e2.eval(fun_dict)
 
     def evalEnv (self,fun_dict,env):
+        # Push the bindings to the environment before evaluation
         for (id,e) in self._bindings:
-            print "in ELet"
+            v = e.evalEnv(fun_dict, env)
             if id in env:
-                env[id] = [e] + env[id]
+                env[id] = [EValue(v)] + env[id]
             else:
-                env[id] = [e]
+                env[id] = [EValue(v)]
 
-        return self._e2.evalEnv(fun_dict, env)
+        result = self._e2.evalEnv(fun_dict, env)
+
+        # Pop the bindings from the environment after evaluation
+        for (id,e) in self._bindings:
+            env[id] = env[id][1:]
+
+        return result
 
     def substitute (self,id,new_e):
         new_bindings = [ (bid,be.substitute(id,new_e)) for (bid,be) in self._bindings]
@@ -226,18 +233,24 @@ class ECall (Exp):
         # Ensure that we only evaluate every EId once
         idToValue = {}
         for e in self._exps:
-            if e._id not in idToValue:
+            if isinstance(e, EId) and e._id not in idToValue:
                 idToValue[e._id] = e.evalEnv(fun_dict,env)
 
+        # Push the parameter values to the environment before evaluation
         for (e,p) in zip(self._exps,params):
-            v = idToValue[e._id]
+            v = idToValue[e._id] if isinstance(e, EId) else e.evalEnv(fun_dict,env)
             if p in env:
                 env[p] = [EValue(v)] + env[p]
             else:
                 env[p] = [EValue(v)]
-        print env['x'][0]
-        print env['y'][0]
-        return body.evalEnv(fun_dict,env)
+
+        result = body.evalEnv(fun_dict,env)
+
+        # Pop the parameter values from the environment after evaluation
+        for (e,p) in zip(self._exps, params):
+            env[p] = env[p][1:]
+
+        return result
 
     def substitute (self,var,new_e):
         new_es = [ e.substitute(var,new_e) for e in self._exps]
@@ -322,6 +335,7 @@ INITIAL_FUN_DICT = {
                                                                EId("e")])]))}
 }
 
+INITIAL_ENV_DICT = {}
 
 
 ##
@@ -425,18 +439,36 @@ def shell ():
             fun_dict[result["name"]] = result
             print "Function {} added to functions dictionary".format(result["name"])
 
+
+def shellEnv ():
+    # A simple shell with environment
+    # Repeatedly read a line of input, parse it, and evaluate the result
+
+    print "Homework 4 - Calc Language"
+
+    # work on copies because we'll be adding to them
+    fun_dict = INITIAL_FUN_DICT.copy()
+    env_dict = INITIAL_ENV_DICT.copy()
+
+    while True:
+        inp = raw_input("calc_env> ")
+        if not inp:
+            return
+        result = parse(inp)
+        if result["result"] == "expression":
+            exp = result["expr"]
+            print "Abstract representation:", exp
+            v = exp.evalEnv(fun_dict, env_dict)
+            print v
+        elif result["result"] == "function":
+            # a result is already of the right form to put in the
+            # functions dictionary
+            fun_dict[result["name"]] = result
+            print "Function {} added to functions dictionary".format(result["name"])
+
+
 # increase stack size to let us call recursive functions quasi comfortably
 sys.setrecursionlimit(10000)
 
-
 if __name__ == "__main__":
-    env = {}
-
-    inp = "(let ((x 10)) (let ((y 20)) (* x x)))"
-    result = parse(inp)
-    if result["result"] == "expression":
-        exp = result["expr"]
-        v = exp.evalEnv(INITIAL_FUN_DICT,env)
-        print v
-
-##shell
+    shellEnv()
