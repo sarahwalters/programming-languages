@@ -417,6 +417,9 @@ def parse (input):
     pLET = "(" + Keyword("let") + "(" + pBINDINGS + ")" + pEXPR + ")"
     pLET.setParseAction(lambda result: ELet(result[3],result[5]))
 
+    pLETS = "(" + Keyword("let*") + "(" + pBINDINGS + ")" + pEXPR + ")"
+    pLETS.setParseAction(lambda result: expand_let(result[3], result[5]))
+
     pEXPRS = ZeroOrMore(pEXPR)
     pEXPRS.setParseAction(lambda result: [result])
 
@@ -451,7 +454,7 @@ def parse (input):
     pCALL = "(" + pNAME + pEXPRS + ")"
     pCALL.setParseAction(lambda result: ECall(result[1],result[2]))
 
-    pEXPR << (pINTEGER | pBOOLEAN | pIDENTIFIER | pIF | pAND | pOR | pCOND | pLET | pCALL)
+    pEXPR << (pINTEGER | pBOOLEAN | pIDENTIFIER | pIF | pAND | pOR | pCOND | pLETS | pLET | pCALL)
 
     # can't attach a parse action to pEXPR because of recursion, so let's duplicate the parser
     pTOPEXPR = pEXPR.copy()
@@ -467,6 +470,15 @@ def parse (input):
 
     result = pTOP.parseString(input)[0]
     return result    # the first element of the result is the expression
+
+
+def expand_let(bindings, exp):
+    head = bindings[0]
+    tail = bindings[1:]
+    if tail == []:
+        return ELet([head], exp)
+    else:
+        return ELet([head], expand_let(tail, exp))
 
 
 def shell ():
