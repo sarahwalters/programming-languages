@@ -33,6 +33,9 @@ class EValue (Exp):
     def eval (self,fun_dict):
         return self._value
 
+    def evalEnv (self,fun_dict,env):
+        return self._value
+
     def substitute (self,id,new_e):
         return self
 
@@ -49,6 +52,9 @@ class EInteger (Exp):
     def eval (self,fun_dict):
         return VInteger(self._integer)
 
+    def evalEnv (self,fun_dict,env):
+        return VInteger(self._integer)
+
     def substitute (self,id,new_e):
         return self
 
@@ -63,6 +69,9 @@ class EBoolean (Exp):
         return "EBoolean({})".format(self._boolean)
 
     def eval (self,fun_dict):
+        return VBoolean(self._boolean)
+
+    def evalEnv (self,fun_dict,env):
         return VBoolean(self._boolean)
 
     def substitute (self,id,new_e):
@@ -84,6 +93,10 @@ class EPrimCall (Exp):
 
     def eval (self,fun_dict):
         vs = [ e.eval(fun_dict) for e in self._exps ]
+        return apply(self._prim,vs)
+
+    def evalEnv (self,fun_dict,env):
+        vs = [ e.evalEnv(fun_dict,env) for e in self._exps ]
         return apply(self._prim,vs)
 
     def substitute (self,id,new_e):
@@ -111,6 +124,15 @@ class EIf (Exp):
         else:
             return self._else.eval(fun_dict)
 
+    def evalEnv (self,fun_dict,env):
+        v = self._cond.evalEnv(fun_dict,env)
+        if v.type != "boolean":
+            raise Exception ("Runtime error: condition not a Boolean")
+        if v.value:
+            return self._then.evalEnv(fun_dict,env)
+        else:
+            return self._else.evalEnv(fun_dict,env)
+
     def substitute (self,id,new_e):
         return EIf(self._cond.substitute(id,new_e),
                    self._then.substitute(id,new_e),
@@ -137,6 +159,16 @@ class ELet (Exp):
             new_e2 = new_e2.substitute(id,EValue(v))
         return new_e2.eval(fun_dict)
 
+    def evalEnv (self,fun_dict,env):
+        for (id,e) in self._bindings:
+            print "in ELet"
+            if id in env:
+                env[id] = [e] + env[id]
+            else:
+                env[id] = [e]
+
+        return self._e2.evalEnv(fun_dict, env)
+
     def substitute (self,id,new_e):
         new_bindings = [ (bid,be.substitute(id,new_e)) for (bid,be) in self._bindings]
         if id in [ bid for (bid,_) in self._bindings]:
@@ -155,6 +187,9 @@ class EId (Exp):
 
     def eval (self,fun_dict):
         raise Exception("Runtime error: unknown identifier {}".format(self._id))
+
+    def evalEnv (self,fun_dict,env):
+        return env[self._id][0].evalEnv(fun_dict,env)
 
     def substitute (self,id,new_e):
         if id == self._id:
@@ -182,10 +217,31 @@ class ECall (Exp):
             body = body.substitute(p,EValue(val))
         return body.eval(fun_dict)
 
+    def evalEnv (self,fun_dict,env):
+        params = fun_dict[self._name]["params"]
+        body = fun_dict[self._name]["body"]
+        if len(params) != len(self._exps):
+            raise Exception("Runtime error: wrong number of argument calling function {}".format(self._name))
+
+        # Ensure that we only evaluate every EId once
+        idToValue = {}
+        for e in self._exps:
+            if e._id not in idToValue:
+                idToValue[e._id] = e.evalEnv(fun_dict,env)
+
+        for (e,p) in zip(self._exps,params):
+            v = idToValue[e._id]
+            if p in env:
+                env[p] = [EValue(v)] + env[p]
+            else:
+                env[p] = [EValue(v)]
+        print env['x'][0]
+        print env['y'][0]
+        return body.evalEnv(fun_dict,env)
+
     def substitute (self,var,new_e):
         new_es = [ e.substitute(var,new_e) for e in self._exps]
         return ECall(self._name,new_es)
-
 
 
 #
@@ -373,4 +429,14 @@ def shell ():
 sys.setrecursionlimit(10000)
 
 
-##shell()
+if __name__ == "__main__":
+    env = {}
+
+    inp = "(let ((x 10)) (let ((y 20)) (* x x)))"
+    result = parse(inp)
+    if result["result"] == "expression":
+        exp = result["expr"]
+        v = exp.evalEnv(INITIAL_FUN_DICT,env)
+        print v
+
+##shell
