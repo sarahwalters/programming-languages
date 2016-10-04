@@ -1,9 +1,9 @@
 ############################################################
 # HOMEWORK 4
 #
-# Team members:
+# Team members: Austin Greene, Sarah Walters
 #
-# Emails:
+# Emails: austin.greene@students.olin.edu, sarah.walters@students.olin.edu
 #
 # Remarks:
 #
@@ -266,6 +266,31 @@ INITIAL_FUN_DICT = {
                                                                EId("e")])]))}
 }
 
+## PARSER HELPERS
+
+def wrap_ands(bindings):
+    head = bindings[0]
+    tail = bindings[1:]
+    if tail == []:
+        return head
+    else:
+        return EIf(head, wrap_ands(tail), EBoolean(False))
+
+def wrap_ors(bindings):
+    head = bindings[0]
+    tail = bindings[1:]
+    if tail == []:
+        return head
+    else:
+        return EIf(head, EBoolean(True), wrap_ors(tail))
+
+def wrap_conds(conds):
+    head = conds[0]
+    tail = conds[1:]
+    if tail == []:
+        return EIf(head['if'], head['then'], EBoolean(False))
+    else:
+        return EIf(head['if'], head['then'], wrap_conds(tail))
 
 
 ##
@@ -323,10 +348,38 @@ def parse (input):
     pEXPRS = ZeroOrMore(pEXPR)
     pEXPRS.setParseAction(lambda result: [result])
 
+    pANDZERO = "(" + Keyword("and") + ")"
+    pANDZERO.setParseAction(lambda result: EBoolean(True))
+
+    pANDMULTI = "(" + Keyword("and") + OneOrMore(pEXPR) + ")"
+    pANDMULTI.setParseAction(lambda result: wrap_ands(result[2:-1]))
+
+    pAND = (pANDMULTI | pANDZERO)
+
+    pORZERO = "(" + Keyword("or") + ")"
+    pORZERO.setParseAction(lambda result: EBoolean(False))
+
+    pORMULTI = "(" + Keyword("or") + OneOrMore(pEXPR) + ")"
+    pORMULTI.setParseAction(lambda result: wrap_ors(result[2:-1]))
+
+    pOR = (pORMULTI | pORZERO)
+
+    pCONDS = "(" + pEXPR('if')  + pEXPR('then') + ")"
+    pCONDS.setParseAction(lambda result: {'if': result['if'],
+                                          'then': result['then']})
+
+    pCONDZERO = "(" + Keyword("cond") + ")"
+    pCONDZERO.setParseAction(lambda result: EBoolean(False))
+
+    pCONDMULTI = "(" + Keyword("cond") + OneOrMore(pCONDS)('conds') + ")"
+    pCONDMULTI.setParseAction(lambda result: wrap_conds(result['conds']))
+
+    pCOND = (pCONDMULTI | pCONDZERO)
+
     pCALL = "(" + pNAME + pEXPRS + ")"
     pCALL.setParseAction(lambda result: ECall(result[1],result[2]))
 
-    pEXPR << (pINTEGER | pBOOLEAN | pIDENTIFIER | pIF | pLET | pCALL)
+    pEXPR << (pINTEGER | pBOOLEAN | pIDENTIFIER | pIF | pAND | pOR | pCOND | pLET | pCALL)
 
     # can't attach a parse action to pEXPR because of recursion, so let's duplicate the parser
     pTOPEXPR = pEXPR.copy()
