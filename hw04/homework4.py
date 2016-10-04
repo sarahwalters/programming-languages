@@ -364,6 +364,31 @@ def wrap_conds(conds):
     else:
         return EIf(head['if'], head['then'], wrap_conds(tail))
 
+def wrap_lets(bindings, exp):
+    head = bindings[0]
+    tail = bindings[1:]
+    if tail == []:
+        return ELet([head], exp)
+    else:
+        return ELet([head], wrap_lets(tail, exp))
+
+def wrap_cases(caseValue, caseBlocks):
+    return ELet([("__case__", caseValue)], expand_caseBlocks(caseBlocks))
+
+def expand_caseBlocks(caseBlocks):
+    head = caseBlocks[0]
+    tail = caseBlocks[1:]
+    thenBlock = EBoolean(False) if tail == [] else expand_caseBlocks(tail)
+    return EIf(head['matchCheck'], head['returnValue'], thenBlock)
+
+def wrap_caseBlocks(matchValues, returnValue):
+    return {'matchCheck': expand_matchValues(matchValues), 'returnValue': returnValue}
+
+def expand_matchValues(matchValues):
+    head = matchValues[0]
+    tail = matchValues[1:]
+    thenBlock = ECall("=", [EId("__case__"), tail[0]]) if len(tail) == 1 else expand_matchValues(tail)
+    return EIf(ECall("=", [EId("__case__"), head]), EBoolean(True), thenBlock)
 
 ##
 ## PARSER
@@ -418,7 +443,7 @@ def parse (input):
     pLET.setParseAction(lambda result: ELet(result[3],result[5]))
 
     pLETS = "(" + Keyword("let*") + "(" + pBINDINGS + ")" + pEXPR + ")"
-    pLETS.setParseAction(lambda result: expand_let(result[3], result[5]))
+    pLETS.setParseAction(lambda result: wrap_lets(result[3], result[5]))
 
     pEXPRS = ZeroOrMore(pEXPR)
     pEXPRS.setParseAction(lambda result: [result])
@@ -442,7 +467,6 @@ def parse (input):
     pCONDS = "(" + pEXPR('if')  + pEXPR('then') + ")"
     pCONDS.setParseAction(lambda result: {'if': result['if'],
                                           'then': result['then']})
-
     pCONDZERO = "(" + Keyword("cond") + ")"
     pCONDZERO.setParseAction(lambda result: EBoolean(False))
 
@@ -451,10 +475,18 @@ def parse (input):
 
     pCOND = (pCONDMULTI | pCONDZERO)
 
+    pCASEVALUE = (pIDENTIFIER | pINTEGER)
+
+    pCASEBLOCK = "((" + OneOrMore(pCASEVALUE)("matchValues") + ")" + pCASEVALUE("returnValue") + ")"
+    pCASEBLOCK.setParseAction(lambda result: wrap_caseBlocks(result["matchValues"], result["returnValue"]))
+
+    pCASE = "(" + Keyword("case") + pCASEVALUE("caseValue") + OneOrMore(pCASEBLOCK)("caseBlocks") + ")"
+    pCASE.setParseAction(lambda result: wrap_cases(result["caseValue"] , result["caseBlocks"]))
+
     pCALL = "(" + pNAME + pEXPRS + ")"
     pCALL.setParseAction(lambda result: ECall(result[1],result[2]))
 
-    pEXPR << (pINTEGER | pBOOLEAN | pIDENTIFIER | pIF | pAND | pOR | pCOND | pLETS | pLET | pCALL)
+    pEXPR << (pINTEGER | pBOOLEAN | pIDENTIFIER | pIF | pAND | pOR | pCOND | pCASE | pLETS | pLET | pCALL)
 
     # can't attach a parse action to pEXPR because of recursion, so let's duplicate the parser
     pTOPEXPR = pEXPR.copy()
@@ -470,15 +502,6 @@ def parse (input):
 
     result = pTOP.parseString(input)[0]
     return result    # the first element of the result is the expression
-
-
-def expand_let(bindings, exp):
-    head = bindings[0]
-    tail = bindings[1:]
-    if tail == []:
-        return ELet([head], exp)
-    else:
-        return ELet([head], expand_let(tail, exp))
 
 
 def shell ():
