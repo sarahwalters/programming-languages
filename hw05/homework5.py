@@ -298,7 +298,7 @@ def parse (input):
     pBINDINGS.setParseAction(lambda result: [ result ])
 
     pLET = "(" + Keyword("let") + "(" + pBINDINGS + ")" + pEXPR + ")"
-    pLET.setParseAction(lambda result: letUnimplementedError())
+    pLET.setParseAction(lambda result: transform_let(result[3], result[5]))
 
     pCALL = "(" + pEXPR('fun') + OneOrMore(pEXPR)('args') + ")"
     pCALL.setParseAction(lambda result: ECall(result['fun'], result['args'].asList()))
@@ -322,6 +322,11 @@ def parse (input):
     result = pTOP.parseString(input)[0]
     return result    # the first element of the result is the expression
 
+def transform_let (bindings, letexp):
+    functionParams = [binding[0] for binding in bindings]
+    function = EFunction(functionParams, letexp)
+    functionArgs = [binding[1] for binding in bindings]
+    return ECall(function, functionArgs)
 
 def shell ():
     # A simple shell
@@ -415,8 +420,77 @@ def initial_env_curry ():
 
 
 def parse_curry (input):
-    raise Exception ("ERROR: parse_curry not implemented")
+    # parse a string into an element of the abstract representation,
+    # currying multi-argument functions
 
+    # Grammar:
+    #
+    # <expr> ::= <integer>
+    #            true
+    #            false
+    #            <identifier>
+    #            ( if <expr> <expr> <expr> )
+    #            ( let ( ( <name> <expr> ) ) <expr )
+    #            (function ( <name> ) <expr> )
+    #            ( <expr> <expr> )
+    #
+    # <definition> ::= ( defun <name> ( <name> ) <expr> )
+    #
+
+
+    idChars = alphas+"_+*-~/?!=<>"
+
+    pIDENTIFIER = Word(idChars, idChars+"0123456789")
+    pIDENTIFIER.setParseAction(lambda result: EId(result[0]))
+
+    # A name is like an identifier but it does not return an EId...
+    pNAME = Word(idChars,idChars+"0123456789")
+
+    pINTEGER = Word("0123456789")
+    pINTEGER.setParseAction(lambda result: EValue(VInteger(int(result[0]))))
+
+    pBOOLEAN = Keyword("true") | Keyword("false")
+    pBOOLEAN.setParseAction(lambda result: EValue(VBoolean(result[0]=="true")))
+
+    pEXPR = Forward()
+
+    pIF = "(" + Keyword("if") + pEXPR + pEXPR + pEXPR + ")"
+    pIF.setParseAction(lambda result: EIf(result[2],result[3],result[4]))
+
+    pBINDING = "(" + pNAME + pEXPR + ")"
+    pBINDING.setParseAction(lambda result: (result[1],result[2]))
+
+    pBINDINGS = OneOrMore(pBINDING)
+    pBINDINGS.setParseAction(lambda result: [ result ])
+
+    pLET = "(" + Keyword("let") + "(" + pBINDINGS + ")" + pEXPR + ")"
+    pLET.setParseAction(lambda result: transform_let(result[3], result[5]))
+
+    pCALL = "(" + pEXPR + pEXPR + ")"
+    pCALL.setParseAction(lambda result: ECall(result[1],[result[2]]))
+
+    pFUN = "(" + Keyword("function") + "(" + pNAME + ")" + pEXPR + ")"
+    pFUN.setParseAction(lambda result: curry_function(result[3], result[5]))
+
+    pEXPR << (pINTEGER | pBOOLEAN | pIDENTIFIER | pIF | pLET | pFUN | pCALL)
+
+    # can't attach a parse action to pEXPR because of recursion, so let's duplicate the parser
+    pTOPEXPR = pEXPR.copy()
+    pTOPEXPR.setParseAction(lambda result: {"result":"expression","expr":result[0]})
+
+    pDEFUN = "(" + Keyword("defun") + pNAME + "(" + pNAME + ")" + pEXPR + ")"
+    pDEFUN.setParseAction(lambda result: {"result":"function",
+                                          "name":result[2],
+                                          "param":result[4],
+                                          "body":result[6]})
+    pTOP = (pDEFUN | pTOPEXPR)
+
+    result = pTOP.parseString(input)[0]
+    return result    # the first element of the result is the expression
+
+def curry_function(params, body):
+    print params, body
+    #return EFunction(name, expr)
 
 def shell_curry ():
 
@@ -449,3 +523,11 @@ def shell_curry ():
         except Exception as e:
             print "Exception: {}".format(e)
 
+
+if __name__ == "__main__":
+    params = ["x","y","z"]
+    body = EId("x")
+    curried = curry_function(params, body)
+    # inp = "(defun test (x) x)"
+    # exp = parse_curry(inp)
+    # print exp
