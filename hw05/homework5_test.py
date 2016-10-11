@@ -12,5 +12,15 @@ class TestStringMethods (unittest.TestCase):
         result = parse(inp2)
         env.insert(0,(result["name"],VClosure(result["params"],result["body"],env)))
         self.assertEqual(parse(inp3)['expr'].eval(env).value, 60)
+
+    def test_recursive_func(self):
+        e = EFunction(["n"],
+                      EIf(ECall(EId("zero?"),[EId("n")]),
+                          EValue(VInteger(0)),
+                          ECall(EId("+"),[EId("n"),
+                                          ECall(EId("me"),[ECall(EId("-"),[EId("n"),EValue(VInteger(1))])])])),
+                      name="me")
+        f = e.eval(initial_env())
+        self.assertEqual(ECall(EValue(f),[EValue(VInteger(10))]).eval([]).value, 55)
 if __name__ == '__main__':
     unittest.main()

@@ -102,21 +102,22 @@ class ECall (Exp):
         if f.type != "function":
             raise Exception("Runtime error: trying to call a non-function")
         args = [arg.eval(env) for arg in self._args]
-        new_env = zip(f.params,args) + f.env
+        new_env = zip(f.params,args) + f.env()
         return f.body.eval(new_env)
 
 class EFunction (Exp):
     # Creates an anonymous function
 
-    def __init__ (self,params,body):
+    def __init__ (self,params,body, name=None):
         self._params = params
         self._body = body
+        self._name = name
 
     def __str__ (self):
         return "EFunction([{}],{})".format(self._params,str(self._body))
 
-    def eval (self,env):
-        return VClosure(self._params,self._body,env)
+    def eval (self, env):
+        return VClosure(self._params, self._body, env, self._name)
 
 
 #
@@ -151,11 +152,18 @@ class VBoolean (Value):
 
 class VClosure (Value):
 
-    def __init__ (self,params,body,env):
+    def __init__ (self,params,body,env,name=None):
         self.params = params
         self.body = body
-        self.env = env
+        self.name = name
+        self._env = env
         self.type = "function"
+
+    def env(self):
+        if self.name:
+            return [(self.name, VClosure(self.params, self.body, self._env, self.name))] + self._env
+        else:
+            return self._env
 
     def __str__ (self):
         return "<function [{}] {}>".format(self.params,str(self.body))
