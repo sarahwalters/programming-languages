@@ -95,7 +95,8 @@ class ECall (Exp):
         self._args = exps
 
     def __str__ (self):
-        return "ECall({},{})".format(str(self._fun),str(self._args))
+        prettyArgs = [str(arg) for arg in self._args]
+        return "ECall({},{})".format(str(self._fun),prettyArgs)
 
     def eval (self,env):
         f = self._fun.eval(env)
@@ -104,6 +105,7 @@ class ECall (Exp):
         args = [arg.eval(env) for arg in self._args]
         new_env = zip(f.params,args) + f.env()
         return f.body.eval(new_env)
+
 
 class EFunction (Exp):
     # Creates an anonymous function
@@ -322,11 +324,13 @@ def parse (input):
     result = pTOP.parseString(input)[0]
     return result    # the first element of the result is the expression
 
+
 def transform_let (bindings, letexp):
     functionParams = [binding[0] for binding in bindings]
     function = EFunction(functionParams, letexp)
     functionArgs = [binding[1] for binding in bindings]
     return ECall(function, functionArgs)
+
 
 def shell ():
     # A simple shell
@@ -466,11 +470,11 @@ def parse_curry (input):
     pLET = "(" + Keyword("let") + "(" + pBINDINGS + ")" + pEXPR + ")"
     pLET.setParseAction(lambda result: transform_let(result[3], result[5]))
 
-    pCALL = "(" + pEXPR + pEXPR + ")"
-    pCALL.setParseAction(lambda result: ECall(result[1],[result[2]]))
+    pCALL = "(" + pEXPR('fun') + OneOrMore(pEXPR)('args') + ")"
+    pCALL.setParseAction(lambda result: call_curry(result['fun'], result['args'].asList()))
 
-    pFUN = "(" + Keyword("function") + "(" + pNAME + ")" + pEXPR + ")"
-    pFUN.setParseAction(lambda result: curry_function(result[3], result[5]))
+    pFUN = "(" + Keyword("function") + "(" + OneOrMore(pNAME)('params') + ")" + pEXPR('body') + ")"
+    pFUN.setParseAction(lambda result: defun_curry(result['params'].asList(),result['body']))
 
     pEXPR << (pINTEGER | pBOOLEAN | pIDENTIFIER | pIF | pLET | pFUN | pCALL)
 
@@ -478,22 +482,42 @@ def parse_curry (input):
     pTOPEXPR = pEXPR.copy()
     pTOPEXPR.setParseAction(lambda result: {"result":"expression","expr":result[0]})
 
-    pDEFUN = "(" + Keyword("defun") + pNAME + "(" + pNAME + ")" + pEXPR + ")"
+    pDEFUN = "(" + Keyword("defun") + pNAME('name') + "(" + OneOrMore(pNAME)('params') + ")" + pEXPR('body') + ")"
     pDEFUN.setParseAction(lambda result: {"result":"function",
-                                          "name":result[2],
-                                          "param":result[4],
-                                          "body":result[6]})
+                                          "name":result['name'],
+                                          "params":result['params'].asList(),
+                                          "body":result['body']})
     pTOP = (pDEFUN | pTOPEXPR)
 
     result = pTOP.parseString(input)[0]
     return result    # the first element of the result is the expression
 
-def curry_function(params, body):
-    print params, body
-    #return EFunction(name, expr)
+
+def defun_curry(params, body):
+    head = params[0]
+    tail = params[1:]
+
+    if (tail == []):
+        return EFunction([head], body)
+    else:
+        return EFunction([head], defun_curry(tail, body))
+
+
+def call_curry(fun, args):
+    # grab arguments from the end of the list so, e.g.,
+    # (+ 2 3)
+    # produces the same abstract representation as
+    # ((+ 2) 3)
+    head = args[-1]
+    tail = args[:-1]
+
+    if (tail == []):
+        return ECall(fun, [head])
+    else:
+        return ECall(call_curry(fun, tail), [head])
+
 
 def shell_curry ():
-
     print "Homework 5 - Func Language"
     print "#quit to quit"
     env = initial_env_curry()
@@ -517,17 +541,10 @@ def shell_curry ():
                 # the top-level environment is special, it is shared
                 # amongst all the top-level closures so that all top-level
                 # functions can refer to each other
-                env.insert(0,(result["name"],VClosure([result["param"]],result["body"],env)))
+                curried_fun = defun_curry(result["params"], result["body"]).eval(env)
+                print curried_fun
+                env.insert(0,(result["name"],curried_fun))
                 print "Function {} added to top-level environment".format(result["name"])
 
         except Exception as e:
             print "Exception: {}".format(e)
-
-
-if __name__ == "__main__":
-    params = ["x","y","z"]
-    body = EId("x")
-    curried = curry_function(params, body)
-    # inp = "(defun test (x) x)"
-    # exp = parse_curry(inp)
-    # print exp
