@@ -110,7 +110,7 @@ class ECall (Exp):
 class EFunction (Exp):
     # Creates an anonymous function
 
-    def __init__ (self,params,body, name=None):
+    def __init__ (self,params,body,name=None):
         self._params = params
         self._body = body
         self._name = name
@@ -305,8 +305,13 @@ def parse (input):
     pCALL = "(" + pEXPR('fun') + OneOrMore(pEXPR)('args') + ")"
     pCALL.setParseAction(lambda result: ECall(result['fun'], result['args'].asList()))
 
-    pFUN = "(" + Keyword("function") + "(" + OneOrMore(pNAME)('args') + ")" + pEXPR('body') + ")"
-    pFUN.setParseAction(lambda result: EFunction(result['args'].asList(),result['body']))
+    pANONFUN = "(" + Keyword("function") + "(" + OneOrMore(pNAME)('args') + ")" + pEXPR('body') + ")"
+    pANONFUN.setParseAction(lambda result: EFunction(result['args'].asList(),result['body']))
+
+    pNAMEDFUN = "(" + Keyword("function") + pNAME('name') + "(" + OneOrMore(pNAME)('args') + ")" + pEXPR('body') + ")"
+    pNAMEDFUN.setParseAction(lambda result: EFunction(result['args'].asList(),result['body'],result['name']))
+
+    pFUN = (pANONFUN | pNAMEDFUN)
 
     pEXPR << (pINTEGER | pBOOLEAN | pIDENTIFIER | pIF | pLET | pFUN | pCALL)
 

@@ -14,16 +14,31 @@ class TestStringMethods (unittest.TestCase):
         self.assertEqual(parse(inp3)['expr'].eval(env).value, 60)
 
     def test_recursive_func(self):
+        env = initial_env()
+
         e = EFunction(["n"],
                       EIf(ECall(EId("zero?"),[EId("n")]),
                           EValue(VInteger(0)),
                           ECall(EId("+"),[EId("n"),
                                           ECall(EId("me"),[ECall(EId("-"),[EId("n"),EValue(VInteger(1))])])])),
                       name="me")
-        f = e.eval(initial_env())
+        f = e.eval(env)
         self.assertEqual(ECall(EValue(f),[EValue(VInteger(10))]).eval([]).value, 55)
 
-    def test_parseLet(self):
+    def test_recursive_func_syntax(self):
+        env = initial_env()
+
+        inp1 = "((function (x y) (+ x y)) 10 20)"
+        inp2 = "((function me (n) (if (zero? n) 0 (+ n (me (- n 1))))) 10)"
+        inp3 = "(let ((sum (function me (n) (if (zero? n) 0 (+ n (me (- n 1))))))) (sum 100))"
+        inp4 = "((function me2 (n1 n2) (if (= n2 n1) n2 (+ n2 (me2 n1 (- n2 1))))) 0 20)"
+
+        self.assertEqual(parse(inp1)["expr"].eval(env).value, 30)
+        self.assertEqual(parse(inp2)["expr"].eval(env).value, 55)
+        self.assertEqual(parse(inp3)["expr"].eval(env).value, 5050)
+        self.assertEqual(parse(inp4)["expr"].eval(env).value, 210)
+
+    def test_parse_let(self):
         env = initial_env()
 
         inp1 = "(let ((x 10)) x)"
