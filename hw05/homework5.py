@@ -542,7 +542,6 @@ def shell_curry ():
                 # amongst all the top-level closures so that all top-level
                 # functions can refer to each other
                 curried_fun = defun_curry(result["params"], result["body"]).eval(env)
-                print curried_fun
                 env.insert(0,(result["name"],curried_fun))
                 print "Function {} added to top-level environment".format(result["name"])
 
