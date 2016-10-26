@@ -3,6 +3,8 @@ from homework6 import *
 
 class TestStringMethods (unittest.TestCase):
     def test_for(self):
+        print "\n"
+
         env = initial_env_imp()
 
         inp1 = "for (var i = 0; (lt? i 3); i <- (+ i 1)) { print i; }"
@@ -15,19 +17,40 @@ class TestStringMethods (unittest.TestCase):
                    }
                 """
 
-        print "test_for case 1: should be 0, 1, 2"
+        print "\n* test_for case 1: should be 0, 1, 2"
         self.assertEqual(type(parse_imp(inp1)["stmt"].eval(env)), VNone)
 
-        print "\ntest_for case 2: should be 1, 2, 4, 8"
+        print "\n* test_for case 2: should be 1, 2, 4, 8"
         self.assertEqual(type(parse_imp(inp2)["stmt"].eval(env)), VNone)
 
-        print "\ntest_for case 3: should be 10, 7, 4, 1"
+        print "\n* test_for case 3: should be 10, 7, 4, 1"
         self.assertEqual(type(parse_imp(inp3)["stmt"].eval(env)), VNone)
 
-        print "\ntest_for case 4: should be 0, 4, 1, 7, 2, 10"
+        print "\n* test_for case 4: should be 0, 4, 1, 7, 2, 10"
         self.assertEqual(type(parse_imp(inp4)["stmt"].eval(env)), VNone)
 
-        print ""
+
+    def test_array(self):
+        print "\n"
+
+        env = initial_env_imp()
+
+        setups = [
+            "var size = 5;",
+            "var test = (new-array size);",
+            "for (var i = 0; (lt? i size); i <- (+ i 1)) { test[i] <- (* i 2); }",
+            "print test;",
+            "var square = (function (x) (* x x));",
+            "var testSquared = (with test (map square));"
+        ]
+
+        print "* test_array: setting up"
+        [switch_imp(parse_imp(setup), env) for setup in setups]
+
+        inp1 = "print testSquared;"
+
+        print "\n* test_array case 1: should be <arr [0,4,16,36,64]>"
+        self.assertEqual(switch_imp(parse_imp(inp1), env), None)
 
 
 if __name__ == '__main__':

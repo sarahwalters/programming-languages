@@ -599,6 +599,26 @@ def parse_imp (input):
     return result    # the first element of the result is the expression
 
 
+def switch_imp (result, env):
+    if result["result"] == "statement":
+        stmt = result["stmt"]
+        # print "Abstract representation:", exp
+        v = stmt.eval(env)
+        print v
+
+    elif result["result"] == "abstract":
+        print result["stmt"]
+
+    elif result["result"] == "quit":
+        return
+
+    elif result["result"] == "declaration":
+        (name,expr) = result["decl"]
+        v = expr.eval(env)
+        env.insert(0,(name,VRefCell(v)))
+        print "{} defined".format(name)
+
+
 def shell_imp ():
     # A simple shell
     # Repeatedly read a line of input, parse it, and evaluate the result
@@ -613,25 +633,7 @@ def shell_imp ():
 
         try:
             result = parse_imp(inp)
-
-            if result["result"] == "statement":
-                stmt = result["stmt"]
-                # print "Abstract representation:", exp
-                v = stmt.eval(env)
-                print v
-
-            elif result["result"] == "abstract":
-                print result["stmt"]
-
-            elif result["result"] == "quit":
-                return
-
-            elif result["result"] == "declaration":
-                (name,expr) = result["decl"]
-                v = expr.eval(env)
-                env.insert(0,(name,VRefCell(v)))
-                print "{} defined".format(name)
-
+            switch_imp(result, env)
 
         except Exception as e:
             print "Exception: {}".format(e)
