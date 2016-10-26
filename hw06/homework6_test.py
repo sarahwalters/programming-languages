@@ -39,7 +39,6 @@ class TestStringMethods (unittest.TestCase):
             "var size = 5;",
             "var test = (new-array size);",
             "for (var i = 0; (lt? i size); i <- (+ i 1)) { test[i] <- (* i 2); }",
-            "print test;",
             "var square = (function (x) (* x x));",
             "var testSquared = (with test (map square));"
         ]
@@ -48,9 +47,21 @@ class TestStringMethods (unittest.TestCase):
         [switch_imp(parse_imp(setup), env) for setup in setups]
 
         inp1 = "print testSquared;"
+        inp2 = "print (with test (map (function (x) (* x 2))));"
+        inp3 = "print (with test (index 3));"
+        inp4 = "print (with test (length));"
 
         print "\n* test_array case 1: should be <arr [0,4,16,36,64]>"
         self.assertEqual(switch_imp(parse_imp(inp1), env), None)
+
+        print "\n* test_array case 2: should be <arr [0,4,8,12,16]>"
+        self.assertEqual(switch_imp(parse_imp(inp2), env), None)
+
+        print "\n* test_array case 3: should be 6"
+        self.assertEqual(switch_imp(parse_imp(inp3), env), None)
+
+        print "\n* test_array case 4: should be 5"
+        self.assertEqual(switch_imp(parse_imp(inp4), env), None)
 
 
 if __name__ == '__main__':
