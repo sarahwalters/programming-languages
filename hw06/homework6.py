@@ -290,6 +290,16 @@ def oper_zero (v1):
         return VBoolean(v1.value==0)
     raise Exception ("Runtime error: type error in zero?")
 
+def oper_lt (v1, v2):
+    if v1.type == "integer" and v2.type == "integer":
+        return VBoolean(v1.value < v2.value)
+    raise Exception ("Runtime error: type error in lt?")
+
+def oper_gt(v1, v2):
+    if v1.type == "integer" and v2.type == "integer":
+        return VBoolean(v1.value > v2.value)
+    raise Exception ("Runtime error: type error in lt?")
+
 def oper_deref (v1):
     if v1.type == "ref":
         return v1.content
@@ -346,6 +356,19 @@ def initial_env_imp ():
                 VRefCell(VClosure(["x"],
                                   EPrimCall(oper_zero,[EId("x")]),
                                   env))))
+
+    env.insert(0,
+              ("lt?",
+               VRefCell(VClosure(["x","y"],
+                                 EPrimCall(oper_lt,[EId("x"),EId("y")]),
+                                 env))))
+
+    env.insert(0,
+              ("gt?",
+               VRefCell(VClosure(["x","y"],
+                                 EPrimCall(oper_gt,[EId("x"),EId("y")]),
+                                 env))))
+
     return env
 
 
@@ -444,8 +467,11 @@ def parse_imp (input):
     pSTMT_UPDATE = pNAME + "<-" + pEXPR + ";"
     pSTMT_UPDATE.setParseAction(lambda result: EPrimCall(oper_update,[EId(result[0]),result[2]]))
 
-    pSTMT_FOR = "for" + pDECL_VAR + pEXPR + ";" + pSTMT_UPDATE + pSTMT
-    pSTMT_FOR.setParseAction(lambda result: EFor(result[1], result[2], result[4], result[5]))
+    pSTMT_UPDATE_FOR = pNAME + "<-" + pEXPR
+    pSTMT_UPDATE_FOR.setParseAction(lambda result: EPrimCall(oper_update,[EId(result[0]),result[2]]))
+
+    pSTMT_FOR = "for (" + pDECL_VAR + pEXPR + ";" + pSTMT_UPDATE_FOR + ")" + pSTMT
+    pSTMT_FOR.setParseAction(lambda result: EFor(result[1], result[2], result[4], result[6]))
 
     pSTMTS = ZeroOrMore(pSTMT)
     pSTMTS.setParseAction(lambda result: [result])
