@@ -147,6 +147,7 @@ class ERefCell (Exp):
         v = self._initial.eval(env)
         return VRefCell(v)
 
+
 class EDo (Exp):
 
     def __init__ (self,exps):
@@ -161,6 +162,7 @@ class EDo (Exp):
         for e in self._exps:
             v = e.eval(env)
         return v
+
 
 class EWhile (Exp):
 
@@ -181,6 +183,7 @@ class EWhile (Exp):
             if c.type != "boolean":
                 raise Exception ("Runtime error: while condition not a Boolean")
         return VNone()
+
 
 class EFor (Exp):
 
@@ -206,6 +209,37 @@ class EFor (Exp):
             if c.type != "boolean":
                 raise Exception ("Runtime error: for condition not a Boolean")
         return VNone()
+
+
+class EArray (Exp):
+    # creates a mutable array
+    def __init__ (self, size):
+        self._size = size
+
+    def __str__ (self):
+        print "EArray({})".format(str(self._size))
+
+    def eval (self, env):
+        elts = [VNone() for i in range(self._size.eval(env).value)]
+        return VArray(elts)
+
+
+class EWith (Exp):
+    def __init__ (self, arrExp, bodyExp):
+        self._arrExp = arrExp
+        self._bodyExp = bodyExp
+
+    def __str__ (self):
+        print "EWith({}, {})".format(str(self._arrExp), str(self._bodyExp))
+
+    def eval (self, env):
+        array = self._arrExp.eval(env)
+        if array.type != "array":
+            raise Exception ("Runtime error: expected an array")
+
+        methods = [methodGenerator(env) for methodGenerator in array.methods]
+        new_env = methods + env
+        return self._bodyExp.eval(new_env)
 
 #
 # Values
@@ -259,6 +293,48 @@ class VRefCell (Value):
         return "<ref {}>".format(str(self.content))
 
 
+class VArray (Value):
+
+    def __init__ (self, elts):
+        self.elts = elts
+        self.type = "array"
+
+        self.methods = [
+            lambda env: ("index",
+                         VRefCell(VClosure(["x"],
+                                           EPrimCall(lambda idx: self.elts[idx.value], [EId("x")]),
+                                           env))),
+
+            lambda env: ("length",
+                         VRefCell(VClosure([],
+                                           EPrimCall(lambda: len(self.elts), []),
+                                           env))),
+
+            lambda env: ("map",
+                         VRefCell(VClosure(["f"],
+                                           EPrimCall(makeMapPrim(env), [EId("f")]),
+                                           env)))
+        ]
+
+        def makeMapPrim(env):
+            def prim(f):
+                f_name = " __mapFn__"
+                new_env = [(f_name, f)] + env
+                f_id = EId(f_name)
+
+                mapped = [ECall(f_id, [EValue(elt)]).eval(new_env) for elt in self.elts]
+                return VArray(mapped)
+
+            return prim
+
+
+    def __str__ (self):
+        return "<arr [{}]>".format(",".join([str(elt) for elt in self.elts]))
+
+    def set(self, idx, elt):
+        self.elts[idx] = elt
+
+
 class VNone (Value):
 
     def __init__ (self):
@@ -310,6 +386,13 @@ def oper_update (v1,v2):
         v1.content = v2
         return VNone()
     raise Exception ("Runtime error: updating a non-reference value")
+
+def oper_update_arr (varray, v1, v2): # array, index, new element
+    if varray.type == "array":
+        if v1.type == "integer":
+            varray.set(v1.value, v2)
+            return VNone()
+    raise Exception ("Runtime error: invalid types for array update")
 
 def oper_print (v1):
     print v1
@@ -435,10 +518,16 @@ def parse_imp (input):
     pFUN = "(" + Keyword("function") + "(" + pNAMES + ")" + pEXPR + ")"
     pFUN.setParseAction(lambda result: EFunction(result[3],mkFunBody(result[3],result[5])))
 
+    pARRAY = "(" + Keyword("new-array") + pEXPR + ")"
+    pARRAY.setParseAction(lambda result: EArray(result[2]))
+
+    pWITH = "(" + Keyword("with") + pEXPR + pEXPR + ")"
+    pWITH.setParseAction(lambda result: EWith(result[2], result[3]))
+
     pCALL = "(" + pEXPR + pEXPRS + ")"
     pCALL.setParseAction(lambda result: ECall(result[1],result[2]))
 
-    pEXPR << (pINTEGER | pBOOLEAN | pIDENTIFIER | pIF | pFUN | pCALL)
+    pEXPR << (pINTEGER | pBOOLEAN | pARRAY | pWITH | pIDENTIFIER | pIF | pFUN | pCALL)
 
     pDECL_VAR = "var" + pNAME + "=" + pEXPR + ";"
     pDECL_VAR.setParseAction(lambda result: (result[1], result[3]))
@@ -470,6 +559,9 @@ def parse_imp (input):
     pSTMT_UPDATE_FOR = pNAME + "<-" + pEXPR
     pSTMT_UPDATE_FOR.setParseAction(lambda result: EPrimCall(oper_update,[EId(result[0]),result[2]]))
 
+    pSTMT_UPDATE_ARR = pEXPR + "[" + pEXPR + "]" + "<-" + pEXPR + ";"
+    pSTMT_UPDATE_ARR.setParseAction(lambda result: EPrimCall(oper_update_arr,[result[0], result[2], result[5]]))
+
     pSTMT_FOR = "for (" + pDECL_VAR + pEXPR + ";" + pSTMT_UPDATE_FOR + ")" + pSTMT
     pSTMT_FOR.setParseAction(lambda result: EFor(result[1], result[2], result[4], result[6]))
 
@@ -483,7 +575,7 @@ def parse_imp (input):
     pSTMT_BLOCK = "{" + pDECLS + pSTMTS + "}"
     pSTMT_BLOCK.setParseAction(lambda result: mkBlock(result[1],result[2]))
 
-    pSTMT << ( pSTMT_IF_1 | pSTMT_IF_2 | pSTMT_WHILE | pSTMT_FOR | pSTMT_PRINT | pSTMT_UPDATE | pSTMT_BLOCK )
+    pSTMT << ( pSTMT_IF_1 | pSTMT_IF_2 | pSTMT_WHILE | pSTMT_FOR | pSTMT_PRINT | pSTMT_UPDATE | pSTMT_UPDATE_ARR | pSTMT_BLOCK )
 
     # can't attach a parse action to pSTMT because of recursion, so let's duplicate the parser
     pTOP_STMT = pSTMT.copy()
@@ -526,6 +618,7 @@ def shell_imp ():
                 stmt = result["stmt"]
                 # print "Abstract representation:", exp
                 v = stmt.eval(env)
+                print v
 
             elif result["result"] == "abstract":
                 print result["stmt"]
