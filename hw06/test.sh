@@ -1,2 +1,2 @@
-rm -f ./homework5.pyc; python2 homework5_test.py;
+rm -f ./homework6.pyc; python2 homework6_test.py;
 

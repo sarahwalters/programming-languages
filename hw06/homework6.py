@@ -19,14 +19,14 @@ class EValue (Exp):
     # Value literal (could presumably replace EInteger and EBoolean)
     def __init__ (self,v):
         self._value = v
-    
+
     def __str__ (self):
         return "EValue({})".format(self._value)
 
     def eval (self,env):
         return self._value
 
-    
+
 class EPrimCall (Exp):
     # Call an underlying Python primitive, passing in Values
     #
@@ -182,7 +182,31 @@ class EWhile (Exp):
                 raise Exception ("Runtime error: while condition not a Boolean")
         return VNone()
 
-    
+class EFor (Exp):
+
+    def __init__ (self, decl, cond, update, body):
+        self._decl = decl
+        self._cond = cond
+        self._update = update
+        self._body = body
+
+    def __str__ (self):
+        return "EFor({},{},{},{})".format(str(self._decl),str(self._cond),str(self._update),str(self._body))
+
+    def eval (self, env):
+        new_env = [ (self._decl[0], ERefCell(self._decl[1]).eval(env)) ] + env
+
+        c = self._cond.eval(new_env)
+        if c.type != "boolean":
+            raise Exception ("Runtime error: for condition not a Boolean")
+        while c.value:
+            self._body.eval(new_env)
+            self._update.eval(new_env)
+            c = self._cond.eval(new_env)
+            if c.type != "boolean":
+                raise Exception ("Runtime error: for condition not a Boolean")
+        return VNone()
+
 #
 # Values
 #
@@ -193,7 +217,7 @@ class Value (object):
 
 class VInteger (Value):
     # Value representation of integers
-    
+
     def __init__ (self,i):
         self.value = i
         self.type = "integer"
@@ -201,10 +225,10 @@ class VInteger (Value):
     def __str__ (self):
         return str(self.value)
 
-    
+
 class VBoolean (Value):
     # Value representation of Booleans
-    
+
     def __init__ (self,b):
         self.value = b
         self.type = "boolean"
@@ -212,9 +236,9 @@ class VBoolean (Value):
     def __str__ (self):
         return "true" if self.value else "false"
 
-    
+
 class VClosure (Value):
-    
+
     def __init__ (self,params,body,env):
         self.params = params
         self.body = body
@@ -224,7 +248,7 @@ class VClosure (Value):
     def __str__ (self):
         return "<function [{}] {}>".format(",".join(self.params),str(self.body))
 
-    
+
 class VRefCell (Value):
 
     def __init__ (self,initial):
@@ -246,7 +270,7 @@ class VNone (Value):
 
 # Primitive operations
 
-def oper_plus (v1,v2): 
+def oper_plus (v1,v2):
     if v1.type == "integer" and v2.type == "integer":
         return VInteger(v1.value + v2.value)
     raise Exception ("Runtime error: trying to add non-numbers")
@@ -276,12 +300,12 @@ def oper_update (v1,v2):
         v1.content = v2
         return VNone()
     raise Exception ("Runtime error: updating a non-reference value")
- 
+
 def oper_print (v1):
     print v1
     return VNone()
 
-    
+
 
 
 ############################################################
@@ -337,10 +361,10 @@ def parse_imp (input):
     #            false
     #            <identifier>
     #            ( if <expr> <expr> <expr> )
-    #            ( function ( <name ... ) <expr> )    
+    #            ( function ( <name ... ) <expr> )
     #            ( <expr> <expr> ... )
     #
-    # <decl> ::= var name = expr ; 
+    # <decl> ::= var name = expr ;
     #
     # <stmt> ::= if <expr> <stmt> else <stmt>
     #            while <expr> <stmt>
@@ -394,7 +418,7 @@ def parse_imp (input):
     pEXPR << (pINTEGER | pBOOLEAN | pIDENTIFIER | pIF | pFUN | pCALL)
 
     pDECL_VAR = "var" + pNAME + "=" + pEXPR + ";"
-    pDECL_VAR.setParseAction(lambda result: (result[1],result[3]))
+    pDECL_VAR.setParseAction(lambda result: (result[1], result[3]))
 
     # hack to get pDECL to match only PDECL_VAR (but still leave room
     # to add to pDECL later)
@@ -410,7 +434,7 @@ def parse_imp (input):
 
     pSTMT_IF_2 = "if" + pEXPR + pSTMT
     pSTMT_IF_2.setParseAction(lambda result: EIf(result[1],result[2],EValue(VBoolean(True))))
-   
+
     pSTMT_WHILE = "while" + pEXPR + pSTMT
     pSTMT_WHILE.setParseAction(lambda result: EWhile(result[1],result[2]))
 
@@ -420,17 +444,20 @@ def parse_imp (input):
     pSTMT_UPDATE = pNAME + "<-" + pEXPR + ";"
     pSTMT_UPDATE.setParseAction(lambda result: EPrimCall(oper_update,[EId(result[0]),result[2]]))
 
+    pSTMT_FOR = "for" + pDECL_VAR + pEXPR + ";" + pSTMT_UPDATE + pSTMT
+    pSTMT_FOR.setParseAction(lambda result: EFor(result[1], result[2], result[4], result[5]))
+
     pSTMTS = ZeroOrMore(pSTMT)
     pSTMTS.setParseAction(lambda result: [result])
 
     def mkBlock (decls,stmts):
         bindings = [ (n,ERefCell(expr)) for (n,expr) in decls ]
         return ELet(bindings,EDo(stmts))
-        
+
     pSTMT_BLOCK = "{" + pDECLS + pSTMTS + "}"
     pSTMT_BLOCK.setParseAction(lambda result: mkBlock(result[1],result[2]))
 
-    pSTMT << ( pSTMT_IF_1 | pSTMT_IF_2 | pSTMT_WHILE | pSTMT_PRINT | pSTMT_UPDATE |  pSTMT_BLOCK )
+    pSTMT << ( pSTMT_IF_1 | pSTMT_IF_2 | pSTMT_WHILE | pSTMT_FOR | pSTMT_PRINT | pSTMT_UPDATE | pSTMT_BLOCK )
 
     # can't attach a parse action to pSTMT because of recursion, so let's duplicate the parser
     pTOP_STMT = pSTMT.copy()
@@ -447,7 +474,7 @@ def parse_imp (input):
 
     pQUIT = Keyword("#quit")
     pQUIT.setParseAction(lambda result: {"result":"quit"})
-    
+
     pTOP = (pQUIT | pABSTRACT | pTOP_DECL | pTOP_STMT )
 
     result = pTOP.parseString(input)[0]
@@ -462,7 +489,7 @@ def shell_imp ():
     print "#quit to quit, #abs to see abstract representation"
     env = initial_env_imp()
 
-        
+
     while True:
         inp = raw_input("imp> ")
 
@@ -485,7 +512,10 @@ def shell_imp ():
                 v = expr.eval(env)
                 env.insert(0,(name,VRefCell(v)))
                 print "{} defined".format(name)
-                
-                
+
+
         except Exception as e:
             print "Exception: {}".format(e)
+
+if __name__ == "__main__":
+    shell_imp()
