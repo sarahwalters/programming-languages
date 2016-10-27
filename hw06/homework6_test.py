@@ -11,10 +11,10 @@ class TestStringMethods (unittest.TestCase):
         inp2 = "for (var i = 1; (lt? i 10); i <- (* i 2)) { print i; }"
         inp3 = "for (var i = 10; (gt? i 0); i <- (- i 3)) { print i; }"
         inp4 = """ for (var i = 0; (lt? i 3); i <- (+ i 1)) {
-                       var j = (+ 4 (* 3 i));
-                       print i;
-                       print j;
-                   }
+                        var j = (+ 4 (* 3 i));
+                        print i;
+                        print j;
+                    }
                 """
 
         print "\n* test_for case 1: should be 0, 1, 2"
@@ -28,6 +28,54 @@ class TestStringMethods (unittest.TestCase):
 
         print "\n* test_for case 4: should be 0, 4, 1, 7, 2, 10"
         self.assertEqual(type(parse_imp(inp4)["stmt"].eval(env)), VNone)
+
+    def test_strings(self):
+        env = initial_env_imp()
+
+        inp1 = 'print "hello";'
+        inp2 = 'print "\\"hello\\"";'
+        inp3 = 'print (length "hello");'
+        inp4 = 'print (substring "hello" 1 2);'
+        inp5 = 'print (concat "hel" "lo");'
+        inp6 = 'print (startswith "hello" "h");'
+        inp7 = 'print (endswith "hello" "o");'
+        inp8 = 'print (lower "HELLO");'
+        inp9 = 'print (upper "hello");'
+
+        print "\n* test_for case 1: hello"
+        self.assertEqual(type(parse_imp(inp1)["stmt"].eval(env)), VNone)
+        print "\n* test_for case 2: \"hello\""
+        self.assertEqual(type(parse_imp(inp2)["stmt"].eval(env)), VNone)
+        print "\n* test_for case 3: 5"
+        self.assertEqual(type(parse_imp(inp3)["stmt"].eval(env)), VNone)
+        print "\n* test_for case 4: e"
+        self.assertEqual(type(parse_imp(inp4)["stmt"].eval(env)), VNone)
+        print "\n* test_for case 5: hello"
+        self.assertEqual(type(parse_imp(inp5)["stmt"].eval(env)), VNone)
+        print "\n* test_for case 6: true"
+        self.assertEqual(type(parse_imp(inp6)["stmt"].eval(env)), VNone)
+        print "\n* test_for case 7: true"
+        self.assertEqual(type(parse_imp(inp7)["stmt"].eval(env)), VNone)
+        print "\n* test_for case 8: hello"
+        self.assertEqual(type(parse_imp(inp8)["stmt"].eval(env)), VNone)
+        print "\n* test_for case 9: HELLO"
+        self.assertEqual(type(parse_imp(inp9)["stmt"].eval(env)), VNone)
+
+
+    def test_procedures(self):
+        env = initial_env_imp()
+
+        inp1 = "procedure foo(x,y,z) print (+ (+ x y) z);"
+        inp2 = "foo(1, 2 ,3);"
+
+        result = parse_imp(inp1)
+        (name,expr) = result["decl"]
+        v = expr.eval(env)
+        env.insert(0,(name,VRefCell(v)))
+
+        print "\n* test_for case 1: 6"
+        self.assertEqual(type(parse_imp(inp2)["stmt"].eval(env)), VNone)
+
 
 
     def test_array(self):
@@ -66,3 +114,4 @@ class TestStringMethods (unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+

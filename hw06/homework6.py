@@ -515,6 +515,7 @@ def initial_env_imp ():
               ("gt?",
                VRefCell(VClosure(["x","y"],
                                  EPrimCall(oper_gt,[EId("x"),EId("y")]),
+                                 env))))
     env.insert(0,
                ("length",
                 VRefCell(VClosure(["x"],
@@ -710,9 +711,7 @@ def parse_imp (input):
 def switch_imp (result, env):
     if result["result"] == "statement":
         stmt = result["stmt"]
-        # print "Abstract representation:", exp
         v = stmt.eval(env)
-        print v
 
     elif result["result"] == "abstract":
         print result["stmt"]
