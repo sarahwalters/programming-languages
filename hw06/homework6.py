@@ -6,6 +6,7 @@
 #
 
 import sys
+import random
 
 #
 # Expressions
@@ -339,13 +340,23 @@ class VArray (Value):
 
             lambda env: ("length",
                          VRefCell(VClosure([],
-                                           EPrimCall(lambda: len(self.elts), []),
+                                           EPrimCall(lambda: VInteger(len(self.elts)), []),
                                            env))),
 
             lambda env: ("map",
                          VRefCell(VClosure(["f"],
                                            EPrimCall(makeMapPrim(env), [EId("f")]),
-                                           env)))
+                                           env))),
+
+            lambda env: ("swap",
+                         VRefCell(VClosure(["x","y"],
+                                           EPrimCall(makeSwapPrim(env), [EId("x"),EId("y")]),
+                                           env))),
+
+            lambda env: ("slice",
+                         VRefCell(VClosure(["x","y"],
+                                            EPrimCall(lambda x,y: VArray(self.elts[x.value:y.value]), [EId("x"),EId("y")]),
+                                            env)))
         ]
 
         def makeMapPrim(env):
@@ -356,6 +367,13 @@ class VArray (Value):
 
                 mapped = [ECall(f_id, [EValue(elt)]).eval(new_env) for elt in self.elts]
                 return VArray(mapped)
+
+            return prim
+
+        def makeSwapPrim(env):
+            def prim(x, y):
+                self.elts[x.value], self.elts[y.value] = self.elts[y.value], self.elts[x.value]
+                return VNone()
 
             return prim
 
@@ -403,10 +421,20 @@ def oper_lt (v1, v2):
         return VBoolean(v1.value < v2.value)
     raise Exception ("Runtime error: type error in lt?")
 
+def oper_lte (v1, v2):
+    if v1.type == "integer" and v2.type == "integer":
+        return VBoolean(v1.value <= v2.value)
+    raise Exception ("Runtime error: type error in lte?")
+
 def oper_gt(v1, v2):
     if v1.type == "integer" and v2.type == "integer":
         return VBoolean(v1.value > v2.value)
-    raise Exception ("Runtime error: type error in lt?")
+    raise Exception ("Runtime error: type error in gt?")
+
+def oper_gte(v1, v2):
+    if v1.type == "integer" and v2.type == "integer":
+        return VBoolean(v1.value >= v2.value)
+    raise Exception ("Runtime error: type error in gte?")
 
 def oper_deref (v1):
     if v1.type == "ref":
@@ -428,6 +456,9 @@ def oper_update_arr (varray, v1, v2): # array, index, new element
 
 def oper_print (v1):
     print v1
+    return VNone()
+
+def oper_do (v1):
     return VNone()
 
 def oper_length (v1):
@@ -464,6 +495,11 @@ def oper_upper (v1):
     if v1.type == "string":
         return VString(v1.value.upper())
     raise Exception ("Runtime error: getting the upper of a non-string value")
+
+def oper_random (v1):
+    if v1.type == "integer":
+        return VInteger(random.randint(0, v1.value))
+    raise Exception ("Runtime error: type error in random")
 
 
 
@@ -512,6 +548,12 @@ def initial_env_imp ():
                                  env))))
 
     env.insert(0,
+              ("lte?",
+               VRefCell(VClosure(["x","y"],
+                                 EPrimCall(oper_lte,[EId("x"),EId("y")]),
+                                 env))))
+
+    env.insert(0,
               ("gt?",
                VRefCell(VClosure(["x","y"],
                                  EPrimCall(oper_gt,[EId("x"),EId("y")]),
@@ -550,6 +592,12 @@ def initial_env_imp ():
                ("upper",
                 VRefCell(VClosure(["x"],
                                   EPrimCall(oper_upper,[EId("x")]),
+                                  env))))
+
+    env.insert(0,
+               ("random",
+                VRefCell(VClosure(["x"],
+                                  EPrimCall(oper_random,[EId("x")]),
                                   env))))
 
     return env
@@ -660,7 +708,10 @@ def parse_imp (input):
     pSTMT_WHILE.setParseAction(lambda result: EWhile(result[1],result[2]))
 
     pSTMT_PRINT = "print" + pEXPR + ";"
-    pSTMT_PRINT.setParseAction(lambda result: EPrimCall(oper_print,[result[1]]));
+    pSTMT_PRINT.setParseAction(lambda result: EPrimCall(oper_print,[result[1]]))
+
+    pSTMT_DO = "do" + pEXPR + ";"
+    pSTMT_DO.setParseAction(lambda result: EPrimCall(oper_do,[result[1]]))
 
     pSTMT_UPDATE = pNAME + "<-" + pEXPR + ";"
     pSTMT_UPDATE.setParseAction(lambda result: EPrimCall(oper_update,[EId(result[0]),result[2]]))
@@ -684,7 +735,7 @@ def parse_imp (input):
     pSTMT_BLOCK = "{" + pDECLS + pSTMTS + "}"
     pSTMT_BLOCK.setParseAction(lambda result: mkBlock(result[1],result[2]))
 
-    pSTMT << ( pSTMT_IF_1 | pSTMT_IF_2 | pSTMT_WHILE | pSTMT_FOR |  pSTMT_PRINT | pSTMT_CALL_PRO | pSTMT_UPDATE | pSTMT_UPDATE_ARR | pSTMT_BLOCK )
+    pSTMT << ( pSTMT_IF_1 | pSTMT_IF_2 | pSTMT_WHILE | pSTMT_FOR |  pSTMT_PRINT | pSTMT_DO | pSTMT_CALL_PRO | pSTMT_UPDATE | pSTMT_UPDATE_ARR | pSTMT_BLOCK )
 
     # can't attach a parse action to pSTMT because of recursion, so let's duplicate the parser
     pTOP_STMT = pSTMT.copy()
@@ -724,6 +775,7 @@ def switch_imp (result, env):
         v = expr.eval(env)
         env.insert(0,(name,VRefCell(v)))
         print "{} defined".format(name)
+    return env
 
 
 def shell_imp ():
@@ -740,7 +792,7 @@ def shell_imp ():
 
         try:
             result = parse_imp(inp)
-            switch_imp(result, env)
+            env = switch_imp(result, env)
 
         except Exception as e:
             print "Exception: {}".format(e)
