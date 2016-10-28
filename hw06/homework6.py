@@ -110,7 +110,7 @@ class ECall (Exp):
 
     def eval (self,env):
         f = self._fun.eval(env)
-        if f.type != "function":
+        if f.type != "function" and f.type != "procedure":
             raise Exception("Runtime error: trying to call a non-function")
         args = [ e.eval(env) for e in self._args]
         if len(args) != len(f.params):
@@ -132,6 +132,18 @@ class EFunction (Exp):
     def eval (self,env):
         return VClosure(self._params,self._body,env)
 
+class EProcedure (Exp):
+    # Creates an anonymous function
+
+    def __init__ (self,params,body):
+        self._params = params
+        self._body = body
+
+    def __str__ (self):
+        return "EProcedure([{}],{})".format(",".join(self._params),str(self._body))
+
+    def eval (self,env):
+        return VProcedure(self._params,self._body,env)
 
 class ERefCell (Exp):
     # this could (should) be turned into a primitive
@@ -270,6 +282,15 @@ class VBoolean (Value):
     def __str__ (self):
         return "true" if self.value else "false"
 
+class VString (Value):
+    # Value representation of strings
+
+    def __init__ (self,b):
+        self.value = b
+        self.type = "string"
+
+    def __str__ (self):
+        return self.value
 
 class VClosure (Value):
 
@@ -282,6 +303,17 @@ class VClosure (Value):
     def __str__ (self):
         return "<function [{}] {}>".format(",".join(self.params),str(self.body))
 
+
+class VProcedure (Value):
+
+    def __init__ (self,params,body,env):
+        self.params = params
+        self.body = body
+        self.env = env
+        self.type = "procedure"
+
+    def __str__ (self):
+        return "<procedure [{}] {}>".format(",".join(self.params),str(self.body))
 
 class VRefCell (Value):
 
@@ -398,6 +430,40 @@ def oper_print (v1):
     print v1
     return VNone()
 
+def oper_length (v1):
+    if v1.type == "string":
+        return VInteger(len(v1.value))
+    raise Exception ("Runtime error: getting the length of a non-string value")
+
+def oper_substring (v1, v2, v3):
+    if v1.type == "string" and v2.type == "integer" and v3.type == "integer":
+        return VString(v1.value[v2.value:v3.value])
+    raise Exception ("Runtime error: Improper arguements for substring function")
+
+def oper_concat (v1, v2):
+    if v1.type == "string" and v2.type == "string":
+        return VString(v1.value + v2.value)
+    raise Exception ("Runtime error: concat with non-string value(s)")
+
+def oper_startswith (v1, v2):
+    if v1.type == "string" and v2.type == "string":
+        return VBoolean(v1.value.startswith(v2.value))
+    raise Exception ("Runtime error: startswith with non-string value(s)")
+
+def oper_endswith (v1, v2):
+    if v1.type == "string" and v2.type == "string":
+        return VBoolean(v1.value.endswith(v2.value))
+    raise Exception ("Runtime error: endswith with non-string value(s)")
+
+def oper_lower (v1):
+    if v1.type == "string":
+        return VString(v1.value.lower())
+    raise Exception ("Runtime error: getting the lower of a non-string value")
+
+def oper_upper (v1):
+    if v1.type == "string":
+        return VString(v1.value.upper())
+    raise Exception ("Runtime error: getting the upper of a non-string value")
 
 
 
@@ -412,7 +478,7 @@ def oper_print (v1):
 ##
 # cf http://pyparsing.wikispaces.com/
 
-from pyparsing import Word, Literal, ZeroOrMore, OneOrMore, Keyword, Forward, alphas, alphanums, NoMatch
+from pyparsing import Word, Literal, ZeroOrMore, OneOrMore, delimitedList, Keyword, QuotedString, Forward, alphas, alphanums, NoMatch
 
 
 def initial_env_imp ():
@@ -439,7 +505,6 @@ def initial_env_imp ():
                 VRefCell(VClosure(["x"],
                                   EPrimCall(oper_zero,[EId("x")]),
                                   env))))
-
     env.insert(0,
               ("lt?",
                VRefCell(VClosure(["x","y"],
@@ -451,6 +516,41 @@ def initial_env_imp ():
                VRefCell(VClosure(["x","y"],
                                  EPrimCall(oper_gt,[EId("x"),EId("y")]),
                                  env))))
+    env.insert(0,
+               ("length",
+                VRefCell(VClosure(["x"],
+                                  EPrimCall(oper_length,[EId("x")]),
+                                  env))))
+    env.insert(0,
+               ("substring",
+                VRefCell(VClosure(["x","y","z"],
+                                  EPrimCall(oper_substring,[EId("x"),EId("y"), EId("z")]),
+                                  env))))
+    env.insert(0,
+               ("concat",
+                VRefCell(VClosure(["x","y"],
+                                  EPrimCall(oper_concat,[EId("x"),EId("y")]),
+                                  env))))
+    env.insert(0,
+               ("startswith",
+                VRefCell(VClosure(["x","y"],
+                                  EPrimCall(oper_startswith,[EId("x"),EId("y")]),
+                                  env))))
+    env.insert(0,
+               ("endswith",
+                VRefCell(VClosure(["x","y"],
+                                  EPrimCall(oper_endswith,[EId("x"),EId("y")]),
+                                  env))))
+    env.insert(0,
+               ("lower",
+                VRefCell(VClosure(["x"],
+                                  EPrimCall(oper_lower,[EId("x")]),
+                                  env))))
+    env.insert(0,
+               ("upper",
+                VRefCell(VClosure(["x"],
+                                  EPrimCall(oper_upper,[EId("x")]),
+                                  env))))
 
     return env
 
@@ -503,6 +603,9 @@ def parse_imp (input):
     pBOOLEAN = Keyword("true") | Keyword("false")
     pBOOLEAN.setParseAction(lambda result: EValue(VBoolean(result[0]=="true")))
 
+    pSTRING = QuotedString('"', escChar="\\", multiline=True)
+    pSTRING.setParseAction(lambda result: EValue(VString(result[0])))
+
     pEXPR = Forward()
 
     pEXPRS = ZeroOrMore(pEXPR)
@@ -527,19 +630,25 @@ def parse_imp (input):
     pCALL = "(" + pEXPR + pEXPRS + ")"
     pCALL.setParseAction(lambda result: ECall(result[1],result[2]))
 
-    pEXPR << (pINTEGER | pBOOLEAN | pARRAY | pWITH | pIDENTIFIER | pIF | pFUN | pCALL)
+    pEXPR << (pINTEGER | pBOOLEAN | pSTRING | pARRAY | pWITH | pIDENTIFIER | pIF | pFUN | pCALL)
+
+    pSTMT = Forward()
 
     pDECL_VAR = "var" + pNAME + "=" + pEXPR + ";"
     pDECL_VAR.setParseAction(lambda result: (result[1], result[3]))
 
+    pDECL_PRO = "procedure" + pNAME('name') + "(" + delimitedList(pNAME)('args') + ")" + pSTMT('body')
+    pDECL_PRO.setParseAction(lambda result: (result['name'], EProcedure(result['args'].asList(), mkFunBody(result['args'].asList(), result['body']))))
+
     # hack to get pDECL to match only PDECL_VAR (but still leave room
     # to add to pDECL later)
-    pDECL = ( pDECL_VAR | NoMatch() )
+    pDECL = ( pDECL_VAR | pDECL_PRO | NoMatch() )
 
     pDECLS = ZeroOrMore(pDECL)
     pDECLS.setParseAction(lambda result: [result])
 
-    pSTMT = Forward()
+    pSTMT_CALL_PRO = pEXPR('name') + "(" + delimitedList(pEXPR)('args') + ")" + Keyword(";")
+    pSTMT_CALL_PRO.setParseAction(lambda result: ECall(result['name'], result['args'].asList()))
 
     pSTMT_IF_1 = "if" + pEXPR + pSTMT + "else" + pSTMT
     pSTMT_IF_1.setParseAction(lambda result: EIf(result[1],result[2],result[4]))
@@ -575,7 +684,7 @@ def parse_imp (input):
     pSTMT_BLOCK = "{" + pDECLS + pSTMTS + "}"
     pSTMT_BLOCK.setParseAction(lambda result: mkBlock(result[1],result[2]))
 
-    pSTMT << ( pSTMT_IF_1 | pSTMT_IF_2 | pSTMT_WHILE | pSTMT_FOR | pSTMT_PRINT | pSTMT_UPDATE | pSTMT_UPDATE_ARR | pSTMT_BLOCK )
+    pSTMT << ( pSTMT_IF_1 | pSTMT_IF_2 | pSTMT_WHILE | pSTMT_FOR |  pSTMT_PRINT | pSTMT_CALL_PRO | pSTMT_UPDATE | pSTMT_UPDATE_ARR | pSTMT_BLOCK )
 
     # can't attach a parse action to pSTMT because of recursion, so let's duplicate the parser
     pTOP_STMT = pSTMT.copy()
@@ -602,9 +711,7 @@ def parse_imp (input):
 def switch_imp (result, env):
     if result["result"] == "statement":
         stmt = result["stmt"]
-        # print "Abstract representation:", exp
         v = stmt.eval(env)
-        print v
 
     elif result["result"] == "abstract":
         print result["stmt"]
