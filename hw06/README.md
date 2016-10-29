@@ -8,6 +8,7 @@
     - Syntax: standard C-style syntax with a \ as an escape character
     - Examples: see `test_string` in [./homework6_test.py](./homework6_test.py)
     - Transcript of Operations:
+      ```
       imp> var x = "\"hello\"";
         x defined
       imp> print x;
@@ -26,14 +27,17 @@
         hello
       imp> print (upper x);
         "HELLO"
+        ```
 
 3. Procedures
     - Implementation: Procedures are instantiated with the expression `procedure name ( args ) stmt` where name is the name of the procedure, args is the arguments expected of the procedure, and stmt is the statement that will be run when the procedure is called. The procedure declaration syntax parses to a EProcedure which evaluates to an VProcedure. When parsed by the shell this VProcedure is associated with the corresponding name of the procedure in the environment. A procedure is called using the syntax `name( args )`. This is parses to an ECall expression which will grab the associated stmt body out of the environment and evaluate the statement body with the appropriate arguements.
     - Transcript:
+      ```
       imp> procedure print_plus_one (x) {x <- (+ x 1); print x;}
         print_plus_one defined
       imp> print_plus_one(1);
         2
+     ```
 
 4. Arrays
     - Implementation: Arrays are instantiated with the expression `(new-array e)`, where `e` is the length of the array which is created. The `new-array` syntax parses to` EArray`, which evaluates to `VArray`. Array methods are defined on `VArray` in the style of the `initial_env_imp` primitive operation declarations.
