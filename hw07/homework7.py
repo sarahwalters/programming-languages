@@ -46,7 +46,7 @@ class EPrimCall (Exp):
         return apply(self._prim,vs)
 
 
-class ELookupGet (Exp):
+class ELookup (Exp):
     # Index/key into an array, dictionary, or string
     # Can provide multiple indices -- e.g. arr[0]["a"] surface syntax
     # translates to abstract representation parameter indices = [0,"a"]
@@ -58,7 +58,7 @@ class ELookupGet (Exp):
 
     def __str__ (self):
         pretty_indices = ",".join([str(idx) for idx in self._indices])
-        return "ELookupGet({},{})".format(self._obj, pretty_indices)
+        return "ELookup({},{})".format(self._obj, pretty_indices)
 
     def eval (self, env):
         vObj = self._obj.eval(env)
@@ -76,8 +76,8 @@ class ELookupGet (Exp):
         return v
 
 
-class ELookupSet (Exp):
-    # Index/key into an array, dictionary, or string
+class ELookupAssign (Exp):
+    # Set value at index/key in an array, dictionary, or string
     # Can provide multiple indices -- e.g. arr[0]["a"] surface syntax
     # translates to abstract representation parameter indices = [0,"a"]
     # (useful for nesting arrays/dictionaries/strings)
@@ -89,7 +89,7 @@ class ELookupSet (Exp):
 
     def __str__ (self):
         pretty_indices = ",".join([str(idx) for idx in self._indices])
-        return "ELookupSet({},{},{})".format(self._obj, pretty_indices,self._exp)
+        return "ELookupAssign({},{},{})".format(self._obj, pretty_indices,self._exp)
 
     def eval (self, env):
         vObj = self._obj.eval(env)
@@ -105,6 +105,22 @@ class ELookupSet (Exp):
             v = vObj.get(head)
 
         v.set(indices[0], self._exp.eval(env))
+        return VNone()
+
+
+class EVariableAssign (Exp):
+    # Set value of a variable in the environment
+
+    def __init__ (self, name, exp):
+        self._name = name
+        self._exp = exp
+
+    def __str__ (self):
+        return "EVariableAssign({},{})".format(self._refcell, self._exp)
+
+    def eval (self, env):
+        refcell = EId(self._name).eval(env)
+        refcell.content = self._exp.eval(env)
         return VNone()
 
 
@@ -529,7 +545,9 @@ def oper_do (v1):
 def oper_length (v1):
     if v1.type == "string":
         return VInteger(len(v1.value))
-    raise Exception ("Runtime error: getting the length of a non-string value")
+    elif v1.type == "array":
+        return VInteger(len(v1.elts))
+    raise Exception ("Runtime error: invalid types for length function")
 
 def oper_substring (v1, v2, v3):
     if v1.type == "string" and v2.type == "integer" and v3.type == "integer":
@@ -636,7 +654,7 @@ def initial_env_imp ():
                                   EPrimCall(oper_not,[EId("x")]),
                                   env))))
     env.insert(0,
-               ("length",
+               ("len",
                 VRefCell(VClosure(["x"],
                                   EPrimCall(oper_length,[EId("x")]),
                                   env))))
@@ -735,7 +753,7 @@ def parse_pj (input):
     pOBJECTINDEX.setParseAction(lambda result: result[1])
     pOBJECTREST = OneOrMore(pOBJECTINDEX)
     pOBJECTLOOKUP = pOBJECTNAME("object") + pOBJECTREST("indices")
-    pOBJECTLOOKUP.setParseAction(lambda result: ELookupGet(result["object"], result["indices"]))
+    pOBJECTLOOKUP.setParseAction(lambda result: ELookup(result["object"], result["indices"]))
 
     pCONDSTART = (pBOOLEAN) # TODO allow more
     pELSE = Keyword(":") + pEXPR("e2")
@@ -799,8 +817,11 @@ def parse_pj (input):
     pSTMT_IFELSE = "if (" + pEXPR("expr") + ")" + pBODY("then") + "else" + pBODY("else")
     pSTMT_IFELSE.setParseAction(lambda result: EIf(result["expr"],result["then"],result["else"]))
 
+    pSTMT_ASSIGN = pNAME("name") + "=" + pEXPR("expr") + ";"
+    pSTMT_ASSIGN.setParseAction(lambda result: EVariableAssign(result["name"], result["expr"]))
+
     pSTMT_OBJECTASSIGN = pOBJECTNAME("object") + pOBJECTREST("indices") + "=" + pEXPR("expr") + ";"
-    pSTMT_OBJECTASSIGN.setParseAction(lambda result: ELookupSet(result["object"], result["indices"], result["expr"]))
+    pSTMT_OBJECTASSIGN.setParseAction(lambda result: ELookupAssign(result["object"], result["indices"], result["expr"]))
 
     pSTMT_WHILE = "while (" + pEXPR("expr") + ")" + pBODY("body")
     pSTMT_WHILE.setParseAction(lambda result: EWhile(result["expr"],result["body"]))
@@ -809,7 +830,7 @@ def parse_pj (input):
     pSTMT_FOR.setParseAction(lambda result: EFor(result["name"], result["expr"], result["body"]))
 
     pSTMT << (pSTMT_PRINT | pSTMT_IFELSE | pSTMT_IF | pSTMT_WHILE | pSTMT_FOR |
-              pSTMT_OBJECTASSIGN | pSTMT_DO)
+              pSTMT_ASSIGN | pSTMT_OBJECTASSIGN | pSTMT_DO)
 
     ### TOP LEVEL ###
     pTOPEXPR = pEXPR.copy()
