@@ -432,7 +432,7 @@ class VDictionary (Value):
         self.type = "dictionary"
 
     def __str__ (self):
-        pretty_bindings = ', '.join(["{}:{}".format(k, str(v)) for (k,v) in self.bindings])
+        pretty_bindings = ', '.join(["{}:{}".format(k, str(v)) for (k,v) in self.bindings.iteritems()])
         return "<dict [{}]>".format(pretty_bindings)
 
     def get (self, key):
@@ -720,15 +720,15 @@ def parse_pj (input):
     pCALL = pFUNTOCALL("funtocall") + pARGLISTS("arglists")
     pCALL.setParseAction(lambda result: unpack_pcall(result["funtocall"], result["arglists"]))
 
-    def mkFunBody (params,body):
+    def mkExprFunBody (params,body):
         bindings = [ (p,ERefCell(EId(p))) for p in params ]
         return ELet(bindings,body)
 
     pANONUSERFUNC = "fun" + pNAMES("names") + pEXPR("expr")
-    pANONUSERFUNC.setParseAction(lambda result: EFunction(result["names"], mkFunBody(result["names"], result["expr"])))
+    pANONUSERFUNC.setParseAction(lambda result: EFunction(result["names"], mkExprFunBody(result["names"], result["expr"])))
 
     pNAMEDUSERFUNC = "fun" + pNAME("name") + pNAMES("names") + pEXPR("expr")
-    pNAMEDUSERFUNC.setParseAction(lambda result: EFunction(result["names"], mkFunBody(result["names"], result["expr"]), result["name"]))
+    pNAMEDUSERFUNC.setParseAction(lambda result: EFunction(result["names"], mkExprFunBody(result["names"], result["expr"]), result["name"]))
 
     pOBJECTNAME = (pCALL | pIDENTIFIER | pSTRING) # TODO allow more?
     pOBJECTINDEX = "[" + pEXPR + "]"
@@ -754,12 +754,22 @@ def parse_pj (input):
     pEXPR << (pLET | pNOT | pANONUSERFUNC | pNAMEDUSERFUNC | pPARENS | pCALL | pOBJECTLOOKUP | pCOND | pPRIMITIVE | pARRAY | pDICTIONARY)
 
     ### DECLARATIONS ####
-    pDECL_VAR = pNAME("name") + "=" + pEXPR("expr") + ";"
+    pBODY = Forward()
+
+    pDEF_VAR = "var" + pNAME("name") + ";"
+    pDEF_VAR.setParseAction(lambda result: (result["name"], EValue(VNone())))
+
+    pDECL_VAR = "var" + pNAME("name") + "=" + pEXPR("expr") + ";"
     pDECL_VAR.setParseAction(lambda result: (result["name"], result["expr"]))
 
-    # hack to get pDECL to match only PDECL_VAR (but still leave room
-    # to add to pDECL later)
-    pDECL = (pDECL_VAR | NoMatch())
+    def mkDefunBody (params,body):
+        bindings = [ (p,ERefCell(EId(p))) for p in params ]
+        return ELet(bindings,body)
+
+    pDEFUN = "def" + pNAME('name') + pNAMES('names') + pBODY('body')
+    pDEFUN.setParseAction(lambda result: (result["name"], EFunction(result["names"], mkDefunBody(result["names"], result["body"]), result["name"])))
+
+    pDECL = (pDECL_VAR | pDEF_VAR | pDEFUN)
 
     pDECLS = ZeroOrMore(pDECL)
     pDECLS.setParseAction(lambda result: [result])
@@ -769,7 +779,7 @@ def parse_pj (input):
     pSTMTS = ZeroOrMore(pSTMT)
     pSTMTS.setParseAction(lambda result: [result])
 
-    pBODY = "{" + pDECLS + pSTMTS + "}"
+    pBODY << ("{" + pDECLS + pSTMTS + "}")
     pBODY.setParseAction(lambda result: mkBlock(result[1],result[2]))
 
     def mkBlock (decls,stmts):
@@ -830,7 +840,7 @@ def unpack_pcall(funtocall, arglists):
 def switch_pj (result, env):
     if result["result"] == "statement":
         stmt = result["stmt"]
-        v = stmt.eval(env)
+        stmt.eval(env)
 
     elif result["result"] == "abstract":
         print result["stmt"]
@@ -839,12 +849,11 @@ def switch_pj (result, env):
         return
 
     elif result["result"] == "declaration":
-        print "hi"
-        print result
         (name,expr) = result["decl"]
         v = expr.eval(env)
         env.insert(0,(name,VRefCell(v)))
         print "{} defined".format(name)
+
     return env
 
 
@@ -863,8 +872,17 @@ def shell_pj ():
             print "Exception: {}".format(e)
 
 if __name__ == "__main__":
-    with open(sys.argv[1]) as f:
-        content = f.read()
-        print content
+    env = initial_env_imp()
 
-    shell_pj()
+    if len(sys.argv) > 1:
+        with open(sys.argv[1]) as f:
+            # load the program
+            content = f.read()
+            result = parse_pj(content)
+            env = switch_pj(result, env)
+
+            # call the main method
+            result = parse_pj("main();")
+            env = switch_pj(result, env)
+    else:
+        shell_pj()
