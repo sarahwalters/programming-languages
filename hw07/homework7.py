@@ -144,11 +144,48 @@ class EIf (Exp):
         else:
             return self._else.eval(env)
 
+class EAnd (Exp):
+    # and expression
+
+    def __init__ (self,e1,e2):
+        self._e1 = e1
+        self._e2 = e2
+
+    def __str__ (self):
+        return "EAnd({},{},{})".format(self._e1,self._e2)
+
+    def eval (self,env):
+        v = self._e1.eval(env)
+        if v.type != "boolean":
+            raise Exception ("Runtime error: condition not a Boolean")
+        if v.value:
+            return self._e2.eval(env)
+        else:
+            return VBoolean(False)
+
+class EOr (Exp):
+    # or expression
+
+    def __init__ (self,e1,e2):
+        self._e1 = e1
+        self._e2 = e2
+
+    def __str__ (self):
+        return "EOr({},{},{})".format(self._e1,self._e2)
+
+    def eval (self,env):
+        v = self._e1.eval(env)
+        if v.type != "boolean":
+            raise Exception ("Runtime error: condition not a Boolean")
+        if v.value:
+            return VBoolean(True)
+        else:
+            return self._e2.eval(env)
 
 class ELet (Exp):
     # local binding
     # allow multiple bindings
-    # eager (call-by-avlue)
+    # eager (call-by-value)
 
     def __init__ (self,bindings,e2):
         self._bindings = bindings
@@ -188,6 +225,8 @@ class ECall (Exp):
         return "ECall({},[{}])".format(str(self._fun),",".join(str(e) for e in self._args))
 
     def eval (self,env):
+        print self._fun
+        print self._args
         f = self._fun.eval(env)
         if f.type != "function" and f.type != "procedure":
             raise Exception("Runtime error: trying to call a non-function")
@@ -386,7 +425,6 @@ class VString (Value):
         return self.value
 
     def get(self, idx):
-        print "sth"
         return self.value[idx]
 
 
@@ -492,25 +530,35 @@ def oper_zero (v1):
         return VBoolean(v1.value==0)
     raise Exception ("Runtime error: type error in zero?")
 
+def oper_eq (v1, v2):
+    if v1.type == "integer" and v2.type == "integer":
+        return VBoolean(v1.value == v2.value)
+    raise Exception ("Runtime error: type error in ==")
+
+def oper_neq (v1, v2):
+    if v1.type == "integer" and v2.type == "integer":
+        return VBoolean(v1.value != v2.value)
+    raise Exception ("Runtime error: type error in <>")
+
 def oper_lt (v1, v2):
     if v1.type == "integer" and v2.type == "integer":
         return VBoolean(v1.value < v2.value)
-    raise Exception ("Runtime error: type error in lt?")
+    raise Exception ("Runtime error: type error in <")
 
 def oper_lte (v1, v2):
     if v1.type == "integer" and v2.type == "integer":
         return VBoolean(v1.value <= v2.value)
-    raise Exception ("Runtime error: type error in lte?")
+    raise Exception ("Runtime error: type error in <=")
 
 def oper_gt(v1, v2):
     if v1.type == "integer" and v2.type == "integer":
         return VBoolean(v1.value > v2.value)
-    raise Exception ("Runtime error: type error in gt?")
+    raise Exception ("Runtime error: type error in >")
 
 def oper_gte(v1, v2):
     if v1.type == "integer" and v2.type == "integer":
         return VBoolean(v1.value >= v2.value)
-    raise Exception ("Runtime error: type error in gte?")
+    raise Exception ("Runtime error: type error in >= ")
 
 def oper_not(v1):
     if v1.type == "boolean":
@@ -627,31 +675,39 @@ def initial_env_imp ():
                                   EPrimCall(oper_zero,[EId("x")]),
                                   env))))
     env.insert(0,
-              ("lt?",
+               ("==",
+                VRefCell(VClosure(["x","y"],
+                                  EPrimCall(oper_eq,[EId("x"),EId("y")]),
+                                  env))))
+    env.insert(0,
+               ("<>",
+                VRefCell(VClosure(["x","y"],
+                                  EPrimCall(oper_neq,[EId("x"),EId("y")]),
+                                  env))))
+    env.insert(0,
+              ("<",
                VRefCell(VClosure(["x","y"],
                                  EPrimCall(oper_lt,[EId("x"),EId("y")]),
                                  env))))
-
     env.insert(0,
-              ("lte?",
+              ("<=",
                VRefCell(VClosure(["x","y"],
                                  EPrimCall(oper_lte,[EId("x"),EId("y")]),
                                  env))))
-
     env.insert(0,
-              ("gt?",
+              (">",
                VRefCell(VClosure(["x","y"],
                                  EPrimCall(oper_gt,[EId("x"),EId("y")]),
-                                 env))))
-    env.insert(0,
-              ("gte?",
-               VRefCell(VClosure(["x","y"],
-                                 EPrimCall(oper_gte,[EId("x"),EId("y")]),
                                  env))))
     env.insert(0,
                ("not",
                 VRefCell(VClosure(["x"],
                                   EPrimCall(oper_not,[EId("x")]),
+                                  env))))
+    env.insert(0,
+               (">=",
+                VRefCell(VClosure(["x","y"],
+                                  EPrimCall(oper_gte,[EId("x"),EId("y")]),
                                   env))))
     env.insert(0,
                ("len",
@@ -715,6 +771,13 @@ def parse_pj (input):
     pNAMES = "(" + Optional(delimitedList(pNAME, delim=","))("namelist") + ")"
     pNAMES.setParseAction(lambda result: [result["namelist"] if "namelist" in result else []])
 
+    pBIEXPR = Forward()
+    pCOMPARISON = Forward()
+    pLOGICAL = Forward()
+    pMATH = Forward()
+    pMATHEXPANDABLE = Forward()
+    pMATHNONEXPANDABLE = Forward()
+
     pEXPR = Forward()
 
     pPARAMS = "(" + Optional(delimitedList(pEXPR, delim=","))("paramlist") + ")"
@@ -769,7 +832,57 @@ def parse_pj (input):
     pLET = "let" + pBINDINGS("bindings") + pEXPR("expr")
     pLET.setParseAction(lambda result: ELet(result["bindings"], result["expr"]))
 
-    pEXPR << (pLET | pNOT | pANONUSERFUNC | pNAMEDUSERFUNC | pPARENS | pCALL | pOBJECTLOOKUP | pCOND | pPRIMITIVE | pARRAY | pDICTIONARY)
+    # mono operator bi expressions
+    def oper_call(res):
+        return ECall(EPrimCall(oper_deref, [EId(res['oper'])]), [res["expr1"], res["expr2"]])
+
+    pAND = pCOMPARISON("expr1") + Keyword("and")("oper") + pBIEXPR("expr2")
+    pAND.setParseAction(lambda result: EAnd(result["expr1"], result["expr2"]))
+
+    pOR = pCOMPARISON("expr1") + Keyword("or")("oper") + pBIEXPR("expr2")
+    pOR.setParseAction(lambda result: EOr(result["expr1"], result["expr2"]))
+
+    pEQ = pMATH("expr1") + Keyword("==")("oper") + pCOMPARISON("expr2")
+    pEQ.setParseAction(lambda result: oper_call(result))
+
+    pGREATER = pMATH("expr1") + Keyword(">")("oper") + pCOMPARISON("expr2")
+    pGREATER.setParseAction(lambda result: oper_call(result))
+
+    pGREQ = pMATH("expr1") + Keyword(">=")("oper") + pCOMPARISON("expr2")
+    pGREQ.setParseAction(lambda result: oper_call(result))
+
+    pLESS = pMATH("expr1") + Keyword("<")("oper") + pCOMPARISON("expr2")
+    pLESS.setParseAction(lambda result: oper_call(result))
+
+    pLEQ = pMATH("expr1") + Keyword("<=")("oper") + pCOMPARISON("expr2")
+    pLEQ.setParseAction(lambda result: oper_call(result))
+
+    pNEQ = pMATH("expr1") + Keyword("<>")("oper") + pCOMPARISON("expr2")
+    pNEQ.setParseAction(lambda result: oper_call(result))
+
+    pPLUS = pMATHEXPANDABLE("expr1") + Keyword("+")("oper") + pMATH("expr2")
+    pPLUS.setParseAction(lambda result: oper_call(result))
+
+    pMINUS = pMATHEXPANDABLE("expr1") + Keyword("-")("oper") + pMATH("expr2")
+    pMINUS.setParseAction(lambda result: oper_call(result))
+
+    pTIMES = pMATHNONEXPANDABLE("expr1") + Keyword("*")("oper") + pMATHEXPANDABLE("expr2")
+    pTIMES.setParseAction(lambda result: oper_call(result))
+
+    pPARENBIEXPR = "(" + pBIEXPR("bi_expr") + ")"
+    pPARENBIEXPR.setParseAction(lambda result: result["bi_expr"])
+
+    pBIEXPR << (pAND | pOR | pCOMPARISON)
+
+    pCOMPARISON << (pGREQ | pLEQ | pNEQ |pLESS | pEQ | pGREATER | pMATH )
+
+    pMATH << (pPLUS | pMINUS | pMATHEXPANDABLE)
+
+    pMATHEXPANDABLE << (pTIMES | pMATHNONEXPANDABLE)
+
+    pMATHNONEXPANDABLE << (pPARENBIEXPR | pNOT | pPARENS | pCALL | pOBJECTLOOKUP | pCOND | pPRIMITIVE)
+
+    pEXPR << (pLET | pNOT | pANONUSERFUNC | pNAMEDUSERFUNC | pPARENS | pCALL | pOBJECTLOOKUP | pCOND | pBIEXPR | pPRIMITIVE | pARRAY | pDICTIONARY)
 
     ### DECLARATIONS ####
     pBODY = Forward()
@@ -844,18 +957,17 @@ def parse_pj (input):
                                             "decl":result[0]})
     pTOP = (pTOPSTMT | pTOPDECL | pTOPEXPR)
 
+    def unpack_pcall(funtocall, arglists):
+        head = arglists[-1]
+        tail = arglists[:-1]
+
+        if len(tail) == 0:
+            return ECall(funtocall, head)
+        else:
+            return ECall(unpack_pcall(funtocall, tail), head)
+
     result = pTOP.parseString(input)[0]
     return result # the first element of the result is the expression
-
-
-def unpack_pcall(funtocall, arglists):
-    head = arglists[-1]
-    tail = arglists[:-1]
-
-    if len(tail) == 0:
-        return ECall(funtocall, head)
-    else:
-        return ECall(unpack_pcall(funtocall, tail), head)
 
 
 def switch_pj (result, env):
@@ -881,9 +993,8 @@ def switch_pj (result, env):
 def shell_pj ():
     print "Homework 7 - PJ Language"
     env = initial_env_imp()
-
     while True:
-        inp = raw_input("pj> ")
+        inp = raw_input("pj >> ")
 
         try:
             result = parse_pj(inp)
