@@ -46,6 +46,84 @@ class EPrimCall (Exp):
         return apply(self._prim,vs)
 
 
+class ELookup (Exp):
+    # Index/key into an array, dictionary, or string
+    # Can provide multiple indices -- e.g. arr[0]["a"] surface syntax
+    # translates to abstract representation parameter indices = [0,"a"]
+    # (useful for nesting arrays/dictionaries/strings)
+
+    def __init__ (self, obj, indices):
+        self._obj = obj
+        self._indices = indices
+
+    def __str__ (self):
+        pretty_indices = ",".join([str(idx) for idx in self._indices])
+        return "ELookup({},{})".format(self._obj, pretty_indices)
+
+    def eval (self, env):
+        vObj = self._obj.eval(env)
+        vIndices = [index.eval(env).value for index in self._indices]
+
+        v = vObj
+        indices = vIndices
+        while len(indices) > 0:
+            if not v.type in ["array", "dictionary", "string"]:
+                raise Exception ("Runtime error: cannot index {}".format(v.type))
+
+            head, indices = indices[0], indices[1:]
+            v = vObj.get(head)
+
+        return v
+
+
+class ELookupAssign (Exp):
+    # Set value at index/key in an array, dictionary, or string
+    # Can provide multiple indices -- e.g. arr[0]["a"] surface syntax
+    # translates to abstract representation parameter indices = [0,"a"]
+    # (useful for nesting arrays/dictionaries/strings)
+
+    def __init__ (self, obj, indices, exp):
+        self._obj = obj
+        self._indices = indices
+        self._exp = exp
+
+    def __str__ (self):
+        pretty_indices = ",".join([str(idx) for idx in self._indices])
+        return "ELookupAssign({},{},{})".format(self._obj, pretty_indices,self._exp)
+
+    def eval (self, env):
+        vObj = self._obj.eval(env)
+        vIndices = [index.eval(env).value for index in self._indices]
+
+        v = vObj
+        indices = vIndices
+        while len(indices) > 1:
+            if not v.type in ["array", "dictionary", "string"]:
+                raise Exception ("Runtime error: cannot index {}".format(v.type))
+
+            head, indices = indices[0], indices[1:]
+            v = vObj.get(head)
+
+        v.set(indices[0], self._exp.eval(env))
+        return VNone()
+
+
+class EVariableAssign (Exp):
+    # Set value of a variable in the environment
+
+    def __init__ (self, name, exp):
+        self._name = name
+        self._exp = exp
+
+    def __str__ (self):
+        return "EVariableAssign({},{})".format(self._refcell, self._exp)
+
+    def eval (self, env):
+        refcell = EId(self._name).eval(env)
+        refcell.content = self._exp.eval(env)
+        return VNone()
+
+
 class EIf (Exp):
     # Conditional expression
 
@@ -123,15 +201,17 @@ class ECall (Exp):
 class EFunction (Exp):
     # Creates an anonymous function
 
-    def __init__ (self,params,body):
+    def __init__ (self,params,body,name=None):
         self._params = params
         self._body = body
+        self._name = name
 
     def __str__ (self):
         return "EFunction([{}],{})".format(",".join(self._params),str(self._body))
 
     def eval (self,env):
-        return VClosure(self._params,self._body,env)
+        return VClosure(self._params,self._body,env,self._name)
+
 
 class EProcedure (Exp):
     # Creates an anonymous function
@@ -200,41 +280,52 @@ class EWhile (Exp):
 
 class EFor (Exp):
 
-    def __init__ (self, decl, cond, update, body):
-        self._decl = decl
-        self._cond = cond
-        self._update = update
+    def __init__ (self, variable, array, body):
+        self._variable = variable
+        self._array = array
         self._body = body
 
     def __str__ (self):
-        return "EFor({},{},{},{})".format(str(self._decl),str(self._cond),str(self._update),str(self._body))
+        return "EFor({},{},{})".format(self._variable,self._array,self._body)
 
     def eval (self, env):
-        new_env = [ (self._decl[0], ERefCell(self._decl[1]).eval(env)) ] + env
+        vArray = self._array.eval(env)
+        if vArray.type != "array":
+            raise Exception ("Runtime error: cannot iterate over a {}".format(self._array.type))
 
-        c = self._cond.eval(new_env)
-        if c.type != "boolean":
-            raise Exception ("Runtime error: for condition not a Boolean")
-        while c.value:
+        for (_, exp) in enumerate(vArray.elts):
+            new_env = [(self._variable, ERefCell(EValue(exp)).eval(env))] + env
             self._body.eval(new_env)
-            self._update.eval(new_env)
-            c = self._cond.eval(new_env)
-            if c.type != "boolean":
-                raise Exception ("Runtime error: for condition not a Boolean")
+
         return VNone()
 
 
 class EArray (Exp):
     # creates a mutable array
-    def __init__ (self, size):
-        self._size = size
+    def __init__ (self, elts):
+        self._elts = elts
 
     def __str__ (self):
-        print "EArray({})".format(str(self._size))
+        pretty_elts = [str(elt) for elt in self._elts]
+        return "EArray([{}])".format(pretty_elts)
 
     def eval (self, env):
-        elts = [VNone() for i in range(self._size.eval(env).value)]
+        elts = [elt.eval(env) for elt in self._elts]
         return VArray(elts)
+
+
+class EDictionary (Exp):
+    # creates a mutable dictionary
+    def __init__ (self, bindings):
+        self._bindings = bindings
+
+    def __str__ (self):
+        pretty_bindings = ', '.join(["{}:{}".format(b[0], str(b[1])) for b in self._bindings])
+        return "EDictionary[{}]".format(pretty_bindings)
+
+    def eval (self, env):
+        bindings = [(b[0], b[1].eval(env).value) for b in self._bindings]
+        return VDictionary(bindings)
 
 
 class EWith (Exp):
@@ -243,7 +334,7 @@ class EWith (Exp):
         self._bodyExp = bodyExp
 
     def __str__ (self):
-        print "EWith({}, {})".format(str(self._arrExp), str(self._bodyExp))
+        return "EWith({}, {})".format(str(self._arrExp), str(self._bodyExp))
 
     def eval (self, env):
         array = self._arrExp.eval(env)
@@ -283,6 +374,7 @@ class VBoolean (Value):
     def __str__ (self):
         return "true" if self.value else "false"
 
+
 class VString (Value):
     # Value representation of strings
 
@@ -293,11 +385,18 @@ class VString (Value):
     def __str__ (self):
         return self.value
 
-class VClosure (Value):
+    def get(self, idx):
+        print "sth"
+        return self.value[idx]
 
-    def __init__ (self,params,body,env):
+
+class VClosure (Value):
+    # Value representation of closures
+
+    def __init__ (self,params,body,env,name=None):
         self.params = params
         self.body = body
+        self.name = name
         self.env = env
         self.type = "function"
 
@@ -316,6 +415,7 @@ class VProcedure (Value):
     def __str__ (self):
         return "<procedure [{}] {}>".format(",".join(self.params),str(self.body))
 
+
 class VRefCell (Value):
 
     def __init__ (self,initial):
@@ -332,57 +432,33 @@ class VArray (Value):
         self.elts = elts
         self.type = "array"
 
-        self.methods = [
-            lambda env: ("index",
-                         VRefCell(VClosure(["x"],
-                                           EPrimCall(lambda idx: self.elts[idx.value], [EId("x")]),
-                                           env))),
-
-            lambda env: ("length",
-                         VRefCell(VClosure([],
-                                           EPrimCall(lambda: VInteger(len(self.elts)), []),
-                                           env))),
-
-            lambda env: ("map",
-                         VRefCell(VClosure(["f"],
-                                           EPrimCall(makeMapPrim(env), [EId("f")]),
-                                           env))),
-
-            lambda env: ("swap",
-                         VRefCell(VClosure(["x","y"],
-                                           EPrimCall(makeSwapPrim(env), [EId("x"),EId("y")]),
-                                           env))),
-
-            lambda env: ("slice",
-                         VRefCell(VClosure(["x","y"],
-                                            EPrimCall(lambda x,y: VArray(self.elts[x.value:y.value]), [EId("x"),EId("y")]),
-                                            env)))
-        ]
-
-        def makeMapPrim(env):
-            def prim(f):
-                f_name = " __mapFn__"
-                new_env = [(f_name, f)] + env
-                f_id = EId(f_name)
-
-                mapped = [ECall(f_id, [EValue(elt)]).eval(new_env) for elt in self.elts]
-                return VArray(mapped)
-
-            return prim
-
-        def makeSwapPrim(env):
-            def prim(x, y):
-                self.elts[x.value], self.elts[y.value] = self.elts[y.value], self.elts[x.value]
-                return VNone()
-
-            return prim
-
-
     def __str__ (self):
         return "<arr [{}]>".format(",".join([str(elt) for elt in self.elts]))
 
-    def set(self, idx, elt):
-        self.elts[idx] = elt
+    def get (self, idx):
+        return self.elts[idx]
+
+    def set (self, idx, v):
+        self.elts[idx] = v
+
+
+class VDictionary (Value):
+    def __init__ (self, bindings):
+        self.bindings = dict(bindings)
+        self.type = "dictionary"
+
+    def __str__ (self):
+        pretty_bindings = ', '.join(["{}:{}".format(k, str(v)) for (k,v) in self.bindings.iteritems()])
+        return "<dict [{}]>".format(pretty_bindings)
+
+    def get (self, key):
+        if key in self.bindings:
+            return self.bindings[key] # just return the value, not the (key,value) tuple
+        else:
+            return VNone() # return none if not in dictionary
+
+    def set (self, key, v):
+        self.bindings[key] = v
 
 
 class VNone (Value):
@@ -436,6 +512,11 @@ def oper_gte(v1, v2):
         return VBoolean(v1.value >= v2.value)
     raise Exception ("Runtime error: type error in gte?")
 
+def oper_not(v1):
+    if v1.type == "boolean":
+        return VBoolean(not v1.value)
+    raise Exception ("Runtime error: type error in not")
+
 def oper_deref (v1):
     if v1.type == "ref":
         return v1.content
@@ -454,8 +535,8 @@ def oper_update_arr (varray, v1, v2): # array, index, new element
             return VNone()
     raise Exception ("Runtime error: invalid types for array update")
 
-def oper_print (v1):
-    print v1
+def oper_print (*args):
+    print ", ".join(str(arg) for arg in args)
     return VNone()
 
 def oper_do (v1):
@@ -464,7 +545,9 @@ def oper_do (v1):
 def oper_length (v1):
     if v1.type == "string":
         return VInteger(len(v1.value))
-    raise Exception ("Runtime error: getting the length of a non-string value")
+    elif v1.type == "array":
+        return VInteger(len(v1.elts))
+    raise Exception ("Runtime error: invalid types for length function")
 
 def oper_substring (v1, v2, v3):
     if v1.type == "string" and v2.type == "integer" and v3.type == "integer":
@@ -521,6 +604,8 @@ def initial_env_imp ():
     # A sneaky way to allow functions to refer to functions that are not
     # yet defined at top level, or recursive functions
     env = []
+    env.insert(0, ("test_arr", VRefCell(VArray([VInteger(42),VInteger(43),VInteger(44)]))))
+    env.insert(0, ("test_dict", VRefCell(VDictionary([('a',VInteger(42)),('b',VInteger(43))]))))
     env.insert(0,
                ("+",
                 VRefCell(VClosure(["x","y"],
@@ -559,7 +644,17 @@ def initial_env_imp ():
                                  EPrimCall(oper_gt,[EId("x"),EId("y")]),
                                  env))))
     env.insert(0,
-               ("length",
+              ("gte?",
+               VRefCell(VClosure(["x","y"],
+                                 EPrimCall(oper_gte,[EId("x"),EId("y")]),
+                                 env))))
+    env.insert(0,
+               ("not",
+                VRefCell(VClosure(["x"],
+                                  EPrimCall(oper_not,[EId("x")]),
+                                  env))))
+    env.insert(0,
+               ("len",
                 VRefCell(VClosure(["x"],
                                   EPrimCall(oper_length,[EId("x")]),
                                   env))))
@@ -593,199 +688,180 @@ def initial_env_imp ():
                 VRefCell(VClosure(["x"],
                                   EPrimCall(oper_upper,[EId("x")]),
                                   env))))
-
     env.insert(0,
                ("random",
                 VRefCell(VClosure(["x"],
                                   EPrimCall(oper_random,[EId("x")]),
                                   env))))
-
     return env
 
 
-
-
-def parse_imp (input):
-    # parse a string into an element of the abstract representation
-
-    # Grammar:
-    #
-    # <expr> ::= <integer>
-    #            true
-    #            false
-    #            <identifier>
-    #            ( if <expr> <expr> <expr> )
-    #            ( function ( <name ... ) <expr> )
-    #            ( <expr> <expr> ... )
-    #
-    # <decl> ::= var name = expr ;
-    #
-    # <stmt> ::= if <expr> <stmt> else <stmt>
-    #            while <expr> <stmt>
-    #            name <- <expr> ;
-    #            print <expr> ;
-    #            <block>
-    #
-    # <block> ::= { <decl> ... <stmt> ... }
-    #
-    # <toplevel> ::= <decl>
-    #                <stmt>
-    #
-
-
+def parse_pj (input):
+    ### EXPRESSIONS ###
     idChars = alphas+"_+*-?!=<>"
 
     pIDENTIFIER = Word(idChars, idChars+"0123456789")
-    #### NOTE THE DIFFERENCE
     pIDENTIFIER.setParseAction(lambda result: EPrimCall(oper_deref,[EId(result[0])]))
-
-    # A name is like an identifier but it does not return an EId...
-    pNAME = Word(idChars,idChars+"0123456789")
-
-    pNAMES = ZeroOrMore(pNAME)
-    pNAMES.setParseAction(lambda result: [result])
-
     pINTEGER = Word("0123456789")
     pINTEGER.setParseAction(lambda result: EValue(VInteger(int(result[0]))))
-
     pBOOLEAN = Keyword("true") | Keyword("false")
-    pBOOLEAN.setParseAction(lambda result: EValue(VBoolean(result[0]=="true")))
-
+    pBOOLEAN.setParseAction(lambda result: EValue(VBoolean(True if result[0] == "true" else False)))
     pSTRING = QuotedString('"', escChar="\\", multiline=True)
     pSTRING.setParseAction(lambda result: EValue(VString(result[0])))
+    pPRIMITIVE = (pINTEGER | pBOOLEAN | pSTRING | pIDENTIFIER)
+
+    pNAME = Word(idChars,idChars+"0123456789") # like an identifier but does not parse to EId
+
+    pNAMES = "(" + Optional(delimitedList(pNAME, delim=","))("namelist") + ")"
+    pNAMES.setParseAction(lambda result: [result["namelist"] if "namelist" in result else []])
 
     pEXPR = Forward()
 
-    pEXPRS = ZeroOrMore(pEXPR)
-    pEXPRS.setParseAction(lambda result: [result])
+    pPARAMS = "(" + Optional(delimitedList(pEXPR, delim=","))("paramlist") + ")"
+    pPARAMS.setParseAction(lambda result: [result["paramlist"] if "paramlist" in result else []])
 
-    pIF = "(" + Keyword("if") + pEXPR + pEXPR + pEXPR + ")"
-    pIF.setParseAction(lambda result: EIf(result[2],result[3],result[4]))
+    pBINDING = pEXPR + "=" + pEXPR
+    pBINDING.setParseAction(lambda result: [(result[0], result[2])])
+    pBINDINGS = "(" + delimitedList(pBINDING,  delim=",")("bindinglist") + ")"
+    pBINDINGS.setParseAction(lambda result: [result["bindinglist"]])
 
-    def mkFunBody (params,body):
+    pARRAY = "[" + Optional(delimitedList(pEXPR, delim=","))("array") + "]"
+    pARRAY.setParseAction(lambda result: EArray(result["array"] if "array" in result else []))
+
+    pENTRY = pNAME("_e1") + ":" + pEXPR("_e2")
+    pENTRY.setParseAction(lambda result: [(result["_e1"], result["_e2"])])
+    pDICTIONARY = "{" + Optional(delimitedList(pENTRY, delim=","))("dict") + "}"
+    pDICTIONARY.setParseAction(lambda result: EDictionary(result["dict"] if "dict" in result else []))
+
+    pFUNTOCALL = (pIDENTIFIER) # TODO allow more?
+    pARGLISTS = OneOrMore(pPARAMS)
+    pCALL = pFUNTOCALL("funtocall") + pARGLISTS("arglists")
+    pCALL.setParseAction(lambda result: unpack_pcall(result["funtocall"], result["arglists"]))
+
+    def mkExprFunBody (params,body):
         bindings = [ (p,ERefCell(EId(p))) for p in params ]
         return ELet(bindings,body)
 
-    pFUN = "(" + Keyword("function") + "(" + pNAMES + ")" + pEXPR + ")"
-    pFUN.setParseAction(lambda result: EFunction(result[3],mkFunBody(result[3],result[5])))
+    pANONUSERFUNC = "fun" + pNAMES("names") + pEXPR("expr")
+    pANONUSERFUNC.setParseAction(lambda result: EFunction(result["names"], mkExprFunBody(result["names"], result["expr"])))
 
-    pARRAY = "(" + Keyword("new-array") + pEXPR + ")"
-    pARRAY.setParseAction(lambda result: EArray(result[2]))
+    pNAMEDUSERFUNC = "fun" + pNAME("name") + pNAMES("names") + pEXPR("expr")
+    pNAMEDUSERFUNC.setParseAction(lambda result: EFunction(result["names"], mkExprFunBody(result["names"], result["expr"]), result["name"]))
 
-    pWITH = "(" + Keyword("with") + pEXPR + pEXPR + ")"
-    pWITH.setParseAction(lambda result: EWith(result[2], result[3]))
+    pOBJECTNAME = (pCALL | pIDENTIFIER | pSTRING) # TODO allow more?
+    pOBJECTINDEX = "[" + pEXPR + "]"
+    pOBJECTINDEX.setParseAction(lambda result: result[1])
+    pOBJECTREST = OneOrMore(pOBJECTINDEX)
+    pOBJECTLOOKUP = pOBJECTNAME("object") + pOBJECTREST("indices")
+    pOBJECTLOOKUP.setParseAction(lambda result: ELookup(result["object"], result["indices"]))
 
-    pCALL = "(" + pEXPR + pEXPRS + ")"
-    pCALL.setParseAction(lambda result: ECall(result[1],result[2]))
+    pCONDSTART = (pBOOLEAN) # TODO allow more
+    pELSE = Keyword(":") + pEXPR("e2")
+    pCOND = pCONDSTART("condition") + Keyword("?") + pEXPR("e1") + pELSE("else")
+    pCOND.setParseAction(lambda result: EIf(result["condition"], result["e1"], result["else"]["e2"]))
 
-    pEXPR << (pINTEGER | pBOOLEAN | pSTRING | pARRAY | pWITH | pIDENTIFIER | pIF | pFUN | pCALL)
+    pPARENS = "(" + pEXPR  + ")"
+    pPARENS.setParseAction(lambda result: result[1])
 
-    pSTMT = Forward()
+    pNOT = "not" + pEXPR("expr")
+    pNOT.setParseAction(lambda result: EPrimCall(oper_not,[result["expr"]]))
 
-    pDECL_VAR = "var" + pNAME + "=" + pEXPR + ";"
-    pDECL_VAR.setParseAction(lambda result: (result[1], result[3]))
+    pLET = "let" + pBINDINGS("bindings") + pEXPR("expr")
+    pLET.setParseAction(lambda result: ELet(result["bindings"], result["expr"]))
 
-    pDECL_PRO = "procedure" + pNAME('name') + "(" + delimitedList(pNAME)('args') + ")" + pSTMT('body')
-    pDECL_PRO.setParseAction(lambda result: (result['name'], EProcedure(result['args'].asList(), mkFunBody(result['args'].asList(), result['body']))))
+    pEXPR << (pLET | pNOT | pANONUSERFUNC | pNAMEDUSERFUNC | pPARENS | pCALL | pOBJECTLOOKUP | pCOND | pPRIMITIVE | pARRAY | pDICTIONARY)
 
-    # hack to get pDECL to match only PDECL_VAR (but still leave room
-    # to add to pDECL later)
-    pDECL = ( pDECL_VAR | pDECL_PRO | NoMatch() )
+    ### DECLARATIONS ####
+    pBODY = Forward()
+
+    pDEF_VAR = "var" + pNAME("name") + ";"
+    pDEF_VAR.setParseAction(lambda result: (result["name"], EValue(VNone())))
+
+    pDECL_VAR = "var" + pNAME("name") + "=" + pEXPR("expr") + ";"
+    pDECL_VAR.setParseAction(lambda result: (result["name"], result["expr"]))
+
+    def mkDefunBody (params,body):
+        bindings = [ (p,ERefCell(EId(p))) for p in params ]
+        return ELet(bindings,body)
+
+    pDEFUN = "def" + pNAME('name') + pNAMES('names') + pBODY('body')
+    pDEFUN.setParseAction(lambda result: (result["name"], EFunction(result["names"], mkDefunBody(result["names"], result["body"]), result["name"])))
+
+    pDECL = (pDECL_VAR | pDEF_VAR | pDEFUN)
 
     pDECLS = ZeroOrMore(pDECL)
     pDECLS.setParseAction(lambda result: [result])
 
-    pSTMT_CALL_PRO = pEXPR('name') + "(" + delimitedList(pEXPR)('args') + ")" + Keyword(";")
-    pSTMT_CALL_PRO.setParseAction(lambda result: ECall(result['name'], result['args'].asList()))
-
-    pSTMT_IF_1 = "if" + pEXPR + pSTMT + "else" + pSTMT
-    pSTMT_IF_1.setParseAction(lambda result: EIf(result[1],result[2],result[4]))
-
-    pSTMT_IF_2 = "if" + pEXPR + pSTMT
-    pSTMT_IF_2.setParseAction(lambda result: EIf(result[1],result[2],EValue(VBoolean(True))))
-
-    pSTMT_WHILE = "while" + pEXPR + pSTMT
-    pSTMT_WHILE.setParseAction(lambda result: EWhile(result[1],result[2]))
-
-    pSTMT_PRINT = "print" + pEXPR + ";"
-    pSTMT_PRINT.setParseAction(lambda result: EPrimCall(oper_print,[result[1]]))
-
-    pSTMT_DO = "do" + pEXPR + ";"
-    pSTMT_DO.setParseAction(lambda result: EPrimCall(oper_do,[result[1]]))
-
-    pSTMT_UPDATE = pNAME + "<-" + pEXPR + ";"
-    pSTMT_UPDATE.setParseAction(lambda result: EPrimCall(oper_update,[EId(result[0]),result[2]]))
-
-    pSTMT_UPDATE_FOR = pNAME + "<-" + pEXPR
-    pSTMT_UPDATE_FOR.setParseAction(lambda result: EPrimCall(oper_update,[EId(result[0]),result[2]]))
-
-    pSTMT_UPDATE_ARR = pEXPR + "[" + pEXPR + "]" + "<-" + pEXPR + ";"
-    pSTMT_UPDATE_ARR.setParseAction(lambda result: EPrimCall(oper_update_arr,[result[0], result[2], result[5]]))
-
-    pSTMT_FOR = "for (" + pDECL_VAR + pEXPR + ";" + pSTMT_UPDATE_FOR + ")" + pSTMT
-    pSTMT_FOR.setParseAction(lambda result: EFor(result[1], result[2], result[4], result[6]))
-
+    ### BODY ###
+    pSTMT = Forward()
     pSTMTS = ZeroOrMore(pSTMT)
     pSTMTS.setParseAction(lambda result: [result])
+
+    pBODY << ("{" + pDECLS + pSTMTS + "}")
+    pBODY.setParseAction(lambda result: mkBlock(result[1],result[2]))
 
     def mkBlock (decls,stmts):
         bindings = [ (n,ERefCell(expr)) for (n,expr) in decls ]
         return ELet(bindings,EDo(stmts))
 
-    pSTMT_BLOCK = "{" + pDECLS + pSTMTS + "}"
-    pSTMT_BLOCK.setParseAction(lambda result: mkBlock(result[1],result[2]))
+    ### STATEMENTS ###
+    pSTMT_DO = pEXPR + ";"
+    pSTMT_DO.setParseAction(lambda result: EDo([result[0]]))
 
-    pSTMT << ( pSTMT_IF_1 | pSTMT_IF_2 | pSTMT_WHILE | pSTMT_FOR |  pSTMT_PRINT | pSTMT_DO | pSTMT_CALL_PRO | pSTMT_UPDATE | pSTMT_UPDATE_ARR | pSTMT_BLOCK )
+    pSTMT_PRINT = "print" + delimitedList(pEXPR, delim=",")("exprs") + ";"
+    pSTMT_PRINT.setParseAction(lambda result: EPrimCall(oper_print,result["exprs"].asList()))
 
-    # can't attach a parse action to pSTMT because of recursion, so let's duplicate the parser
-    pTOP_STMT = pSTMT.copy()
-    pTOP_STMT.setParseAction(lambda result: {"result":"statement",
-                                             "stmt":result[0]})
+    pSTMT_IF = "if (" + pEXPR("expr") + ")" + pBODY("body")
+    pSTMT_IF.setParseAction(lambda result: EIf(result["expr"],result["body"],EValue(VBoolean(True))))
 
-    pTOP_DECL = pDECL.copy()
-    pTOP_DECL.setParseAction(lambda result: {"result":"declaration",
-                                             "decl":result[0]})
+    pSTMT_IFELSE = "if (" + pEXPR("expr") + ")" + pBODY("then") + "else" + pBODY("else")
+    pSTMT_IFELSE.setParseAction(lambda result: EIf(result["expr"],result["then"],result["else"]))
 
-    pABSTRACT = "#abs" + pSTMT
-    pABSTRACT.setParseAction(lambda result: {"result":"abstract",
-                                             "stmt":result[1]})
+    pSTMT_ASSIGN = pNAME("name") + "=" + pEXPR("expr") + ";"
+    pSTMT_ASSIGN.setParseAction(lambda result: EVariableAssign(result["name"], result["expr"]))
 
-    pQUIT = Keyword("#quit")
-    pQUIT.setParseAction(lambda result: {"result":"quit"})
+    pSTMT_OBJECTASSIGN = pOBJECTNAME("object") + pOBJECTREST("indices") + "=" + pEXPR("expr") + ";"
+    pSTMT_OBJECTASSIGN.setParseAction(lambda result: ELookupAssign(result["object"], result["indices"], result["expr"]))
 
-    pTOP = (pQUIT | pABSTRACT | pTOP_DECL | pTOP_STMT )
+    pSTMT_WHILE = "while (" + pEXPR("expr") + ")" + pBODY("body")
+    pSTMT_WHILE.setParseAction(lambda result: EWhile(result["expr"],result["body"]))
+
+    pSTMT_FOR = "for (" + pNAME("name") + "in" + pEXPR("expr") + ")" + pBODY("body")
+    pSTMT_FOR.setParseAction(lambda result: EFor(result["name"], result["expr"], result["body"]))
+
+    pSTMT << (pSTMT_PRINT | pSTMT_IFELSE | pSTMT_IF | pSTMT_WHILE | pSTMT_FOR |
+              pSTMT_ASSIGN | pSTMT_OBJECTASSIGN | pSTMT_DO)
+
+    ### TOP LEVEL ###
+    pTOPEXPR = pEXPR.copy()
+    pTOPEXPR.setParseAction(lambda result: {"result":"expression",
+                                            "expr":result[0]})
+    pTOPSTMT = pSTMT.copy()
+    pTOPSTMT.setParseAction(lambda result: {"result":"statement",
+                                            "stmt":result[0]})
+    pTOPDECL = pDECL.copy()
+    pTOPDECL.setParseAction(lambda result: {"result":"declaration",
+                                            "decl":result[0]})
+    pTOP = (pTOPSTMT | pTOPDECL | pTOPEXPR)
 
     result = pTOP.parseString(input)[0]
-    return result    # the first element of the result is the expression
-
-def parse_pj (input):
-    idChars = alphas+"_+*-?!=<>"
-
-    pNAME = Word(idChars,idChars+"0123456789")
-    pINTEGER = Word("0123456789")
-    pBOOLEAN = Keyword("true") | Keyword("false")
-    pSTRING = QuotedString('"', escChar="\\", multiline=True)
-    pPRIMITIVE = (pNAME | pINTEGER | pBOOLEAN | pSTRING)
-
-    pEXPR = (pPRIMITIVE)
-
-    pPARAMS = delimitedList(pEXPR, delim=",")
-
-    pFUNCALL = pEXPR("function_name") + "(" + Optional(pPARAMS)("params") + ")"
-
-    pTOP = (pFUNCALL)
-
-    result = pTOP.parseString(input).asList()
     return result # the first element of the result is the expression
 
-def print_result(result):
-    print result
-    return result
 
-def switch_imp (result, env):
+def unpack_pcall(funtocall, arglists):
+    head = arglists[-1]
+    tail = arglists[:-1]
+
+    if len(tail) == 0:
+        return ECall(funtocall, head)
+    else:
+        return ECall(unpack_pcall(funtocall, tail), head)
+
+
+def switch_pj (result, env):
     if result["result"] == "statement":
         stmt = result["stmt"]
-        v = stmt.eval(env)
+        stmt.eval(env)
 
     elif result["result"] == "abstract":
         print result["stmt"]
@@ -798,45 +874,36 @@ def switch_imp (result, env):
         v = expr.eval(env)
         env.insert(0,(name,VRefCell(v)))
         print "{} defined".format(name)
+
     return env
 
 
-def shell_imp ():
-    # A simple shell
-    # Repeatedly read a line of input, parse it, and evaluate the result
-
-    print "Homework 6 - Imp Language"
-    print "#quit to quit, #abs to see abstract representation"
-    env = initial_env_imp()
-
-
-    while True:
-        inp = raw_input("imp> ")
-
-        try:
-            result = parse_imp(inp)
-            env = switch_imp(result, env)
-
-        except Exception as e:
-            print "Exception: {}".format(e)
-
 def shell_pj ():
     print "Homework 7 - PJ Language"
-
+    env = initial_env_imp()
 
     while True:
         inp = raw_input("pj> ")
 
         try:
             result = parse_pj(inp)
-            print result
+            env = switch_pj(result, env)
 
         except Exception as e:
             print "Exception: {}".format(e)
 
 if __name__ == "__main__":
-    with open(sys.argv[1]) as f:
-        content = f.read()
-        print content
+    env = initial_env_imp()
 
-    shell_pj()
+    if len(sys.argv) > 1:
+        with open(sys.argv[1]) as f:
+            # load the program
+            content = f.read()
+            result = parse_pj(content)
+            env = switch_pj(result, env)
+
+            # call the main method
+            result = parse_pj("main();")
+            env = switch_pj(result, env)
+    else:
+        shell_pj()
