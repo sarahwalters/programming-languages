@@ -225,8 +225,6 @@ class ECall (Exp):
         return "ECall({},[{}])".format(str(self._fun),",".join(str(e) for e in self._args))
 
     def eval (self,env):
-        print self._fun
-        print self._args
         f = self._fun.eval(env)
         if f.type != "function" and f.type != "procedure":
             raise Exception("Runtime error: trying to call a non-function")
@@ -513,7 +511,11 @@ class VNone (Value):
 def oper_plus (v1,v2):
     if v1.type == "integer" and v2.type == "integer":
         return VInteger(v1.value + v2.value)
-    raise Exception ("Runtime error: trying to add non-numbers")
+    elif v1.type == "string" and v2.type == "string":
+        return VString(v1.value + v2.value)
+    elif v1.type == "array" and v2.type == "array":
+        return VArray(v1.elts + v2.elts)
+    raise Exception ("Runtime error: cannot add {} and {}".format(v1.type, v2.type))
 
 def oper_minus (v1,v2):
     if v1.type == "integer" and v2.type == "integer":
@@ -601,11 +603,6 @@ def oper_substring (v1, v2, v3):
     if v1.type == "string" and v2.type == "integer" and v3.type == "integer":
         return VString(v1.value[v2.value:v3.value])
     raise Exception ("Runtime error: Improper arguements for substring function")
-
-def oper_concat (v1, v2):
-    if v1.type == "string" and v2.type == "string":
-        return VString(v1.value + v2.value)
-    raise Exception ("Runtime error: concat with non-string value(s)")
 
 def oper_startswith (v1, v2):
     if v1.type == "string" and v2.type == "string":
@@ -720,11 +717,6 @@ def initial_env_imp ():
                                   EPrimCall(oper_substring,[EId("x"),EId("y"), EId("z")]),
                                   env))))
     env.insert(0,
-               ("concat",
-                VRefCell(VClosure(["x","y"],
-                                  EPrimCall(oper_concat,[EId("x"),EId("y")]),
-                                  env))))
-    env.insert(0,
                ("startswith",
                 VRefCell(VClosure(["x","y"],
                                   EPrimCall(oper_startswith,[EId("x"),EId("y")]),
@@ -779,6 +771,7 @@ def parse_pj (input):
     pMATHNONEXPANDABLE = Forward()
 
     pEXPR = Forward()
+    pBODY = Forward()
 
     pPARAMS = "(" + Optional(delimitedList(pEXPR, delim=","))("paramlist") + ")"
     pPARAMS.setParseAction(lambda result: [result["paramlist"] if "paramlist" in result else []])
@@ -805,11 +798,11 @@ def parse_pj (input):
         bindings = [ (p,ERefCell(EId(p))) for p in params ]
         return ELet(bindings,body)
 
-    pANONUSERFUNC = "fun" + pNAMES("names") + pEXPR("expr")
-    pANONUSERFUNC.setParseAction(lambda result: EFunction(result["names"], mkExprFunBody(result["names"], result["expr"])))
+    pANONUSERFUNC = "fun" + pNAMES("names") + pBODY("body")
+    pANONUSERFUNC.setParseAction(lambda result: EFunction(result["names"], mkExprFunBody(result["names"], result["body"])))
 
-    pNAMEDUSERFUNC = "fun" + pNAME("name") + pNAMES("names") + pEXPR("expr")
-    pNAMEDUSERFUNC.setParseAction(lambda result: EFunction(result["names"], mkExprFunBody(result["names"], result["expr"]), result["name"]))
+    pNAMEDUSERFUNC = "fun" + pNAME("name") + pNAMES("names") + pBODY("body")
+    pNAMEDUSERFUNC.setParseAction(lambda result: EFunction(result["names"], mkExprFunBody(result["names"], result["body"]), result["name"]))
 
     pOBJECTNAME = (pCALL | pIDENTIFIER | pSTRING) # TODO allow more?
     pOBJECTINDEX = "[" + pEXPR + "]"
@@ -880,13 +873,11 @@ def parse_pj (input):
 
     pMATHEXPANDABLE << (pTIMES | pMATHNONEXPANDABLE)
 
-    pMATHNONEXPANDABLE << (pPARENBIEXPR | pNOT | pPARENS | pCALL | pOBJECTLOOKUP | pCOND | pPRIMITIVE)
+    pMATHNONEXPANDABLE << (pPARENBIEXPR | pNOT | pPARENS | pCALL | pARRAY | pOBJECTLOOKUP | pCOND | pPRIMITIVE)
 
     pEXPR << (pLET | pNOT | pANONUSERFUNC | pNAMEDUSERFUNC | pPARENS | pCALL | pOBJECTLOOKUP | pCOND | pBIEXPR | pPRIMITIVE | pARRAY | pDICTIONARY)
 
     ### DECLARATIONS ####
-    pBODY = Forward()
-
     pDEF_VAR = "var" + pNAME("name") + ";"
     pDEF_VAR.setParseAction(lambda result: (result["name"], EValue(VNone())))
 
@@ -955,7 +946,7 @@ def parse_pj (input):
     pTOPDECL = pDECL.copy()
     pTOPDECL.setParseAction(lambda result: {"result":"declaration",
                                             "decl":result[0]})
-    pTOP = (pTOPSTMT | pTOPDECL | pTOPEXPR)
+    pTOP = OneOrMore(pTOPSTMT | pTOPDECL | pTOPEXPR)
 
     def unpack_pcall(funtocall, arglists):
         head = arglists[-1]
@@ -966,8 +957,7 @@ def parse_pj (input):
         else:
             return ECall(unpack_pcall(funtocall, tail), head)
 
-    result = pTOP.parseString(input)[0]
-    return result # the first element of the result is the expression
+    return pTOP.parseString(input)
 
 
 def switch_pj (result, env):
@@ -997,8 +987,9 @@ def shell_pj ():
         inp = raw_input("pj >> ")
 
         try:
-            result = parse_pj(inp)
-            env = switch_pj(result, env)
+            results = parse_pj(inp)
+            for result in results:
+                env = switch_pj(result, env)
 
         except Exception as e:
             print "Exception: {}".format(e)
@@ -1010,11 +1001,12 @@ if __name__ == "__main__":
         with open(sys.argv[1]) as f:
             # load the program
             content = f.read()
-            result = parse_pj(content)
-            env = switch_pj(result, env)
+            results = parse_pj(content)
+            for result in results:
+                env = switch_pj(result, env)
 
             # call the main method
-            result = parse_pj("main();")
-            env = switch_pj(result, env)
+            main = parse_pj("main();")[0]
+            env = switch_pj(main, env)
     else:
         shell_pj()
