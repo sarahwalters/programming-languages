@@ -758,6 +758,11 @@ def parse_pj (input):
     pSTRING.setParseAction(lambda result: EValue(VString(result[0])))
     pPRIMITIVE = (pINTEGER | pBOOLEAN | pSTRING | pIDENTIFIER)
 
+
+    pCOMPARISONOPER = Keyword(">=") | Keyword("<=") | Keyword("<>") | Keyword("==") |  Keyword("<") | Keyword(">")
+    pMATHOPER = Keyword("+") | Keyword('-')
+    pMATHEXPANDABLEOPER = Keyword('*')
+
     pNAME = Word(idChars,idChars+"0123456789") # like an identifier but does not parse to EId
 
     pNAMES = "(" + Optional(delimitedList(pNAME, delim=","))("namelist") + ")"
@@ -835,43 +840,25 @@ def parse_pj (input):
     pOR = pCOMPARISON("expr1") + Keyword("or")("oper") + pBIEXPR("expr2")
     pOR.setParseAction(lambda result: EOr(result["expr1"], result["expr2"]))
 
-    pEQ = pMATH("expr1") + Keyword("==")("oper") + pCOMPARISON("expr2")
-    pEQ.setParseAction(lambda result: oper_call(result))
+    pCOMPARISONEXPR = pMATH("expr1") + pCOMPARISONOPER("oper") + pCOMPARISON("expr2")
+    pCOMPARISONEXPR.setParseAction(lambda result: oper_call(result))
 
-    pGREATER = pMATH("expr1") + Keyword(">")("oper") + pCOMPARISON("expr2")
-    pGREATER.setParseAction(lambda result: oper_call(result))
+    pMATHEXPR = pMATHEXPANDABLE("expr1") + pMATHOPER("oper") + pMATH("expr2")
+    pMATHEXPR.setParseAction(lambda result: oper_call(result))
 
-    pGREQ = pMATH("expr1") + Keyword(">=")("oper") + pCOMPARISON("expr2")
-    pGREQ.setParseAction(lambda result: oper_call(result))
-
-    pLESS = pMATH("expr1") + Keyword("<")("oper") + pCOMPARISON("expr2")
-    pLESS.setParseAction(lambda result: oper_call(result))
-
-    pLEQ = pMATH("expr1") + Keyword("<=")("oper") + pCOMPARISON("expr2")
-    pLEQ.setParseAction(lambda result: oper_call(result))
-
-    pNEQ = pMATH("expr1") + Keyword("<>")("oper") + pCOMPARISON("expr2")
-    pNEQ.setParseAction(lambda result: oper_call(result))
-
-    pPLUS = pMATHEXPANDABLE("expr1") + Keyword("+")("oper") + pMATH("expr2")
-    pPLUS.setParseAction(lambda result: oper_call(result))
-
-    pMINUS = pMATHEXPANDABLE("expr1") + Keyword("-")("oper") + pMATH("expr2")
-    pMINUS.setParseAction(lambda result: oper_call(result))
-
-    pTIMES = pMATHNONEXPANDABLE("expr1") + Keyword("*")("oper") + pMATHEXPANDABLE("expr2")
-    pTIMES.setParseAction(lambda result: oper_call(result))
+    pMATHEXPANDABLEEXPR = pMATHNONEXPANDABLE("expr1") + pMATHEXPANDABLEOPER("oper") + pMATHEXPANDABLE("expr2")
+    pMATHEXPANDABLEEXPR.setParseAction(lambda result: oper_call(result))
 
     pPARENBIEXPR = "(" + pBIEXPR("bi_expr") + ")"
     pPARENBIEXPR.setParseAction(lambda result: result["bi_expr"])
 
     pBIEXPR << (pAND | pOR | pCOMPARISON)
 
-    pCOMPARISON << (pGREQ | pLEQ | pNEQ |pLESS | pEQ | pGREATER | pMATH )
+    pCOMPARISON << (pCOMPARISONEXPR | pMATH )
 
-    pMATH << (pPLUS | pMINUS | pMATHEXPANDABLE)
+    pMATH << (pMATHEXPR | pMATHEXPANDABLE)
 
-    pMATHEXPANDABLE << (pTIMES | pMATHNONEXPANDABLE)
+    pMATHEXPANDABLE << (pMATHEXPANDABLEEXPR | pMATHNONEXPANDABLE)
 
     pMATHNONEXPANDABLE << (pPARENBIEXPR | pNOT | pPARENS | pCALL | pARRAY | pOBJECTLOOKUP | pCOND | pPRIMITIVE)
 
