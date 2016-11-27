@@ -1,11 +1,9 @@
 
 def pr_array (arr) {
-
   print len(arr),arr;
 }
 
-def test_loop (arr) { 
-
+def test_loop (arr) {
   var n = 0;
   while (n < len(arr)) {
     print n,arr[n];
@@ -25,15 +23,13 @@ def reverse (arr) {
   var result = [];
   var n = len(arr);
   while (n > 0) {
-    result = result + [arr[n-1]];
+    result = result + [arr[n - 1]];
     n = n - 1;
   }
   result;
 }
 
-
-def main () { 
-
+def main () {
   var arr0 = [];
   var arr1 = [10];
   var arr2 = [100,200];
@@ -44,8 +40,8 @@ def main () {
   pr_array(arr2);
   pr_array(arr3);
 
-  pr_array(arr0+arr3);
-  pr_array(arr2+arr3);
+  pr_array(arr0 + arr3);
+  pr_array(arr2 + arr3);
 
   pr_array(reverse(arr3));
 
@@ -61,8 +57,5 @@ def main () {
     print v;
   }
 
-  print map(arr1+arr2,fun(x){x*x;});
-
-  
-  
+  print map(arr1 + arr2,fun(x) {x * x;});
 }

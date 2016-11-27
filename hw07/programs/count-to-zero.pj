@@ -4,3 +4,7 @@ def count_to_zero (n) {
 		n = n - 1;
 	}
 }
+
+def main() {
+	count_to_zero(3);
+}
