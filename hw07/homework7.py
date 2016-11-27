@@ -1,9 +1,13 @@
 ############################################################
-# Simple imperative language
-# C-like surface syntax
-# with S-expression syntax for expressions
-# (no recursive closures)
+# HOMEWORK 7
 #
+# Team members: Austin Greene, Sarah Walters
+#
+# Emails: austin.greene@students.olin.edu, sarah.walters@students.olin.edu
+#
+# Remarks:
+# One deviation from the grammar: operators require spaces on either side
+#   (i.e. 3 + 4 is parsed correctly, 3+4 isn't)
 
 import sys
 import random
