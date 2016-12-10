@@ -82,6 +82,9 @@ def eval_iter (exp,env):
                 if current_exp._id == id:
                     return v
 
+        elif current_exp.expForm == "EMatch":
+            print "this is still TODO"
+
         elif current_exp.expForm == "EFunction":
 
             return VClosure(current_exp._params,current_exp._body,current_env,current_exp._name)
@@ -240,6 +243,41 @@ class ECall (Exp):
 
     def eval (self,env):
         return eval_iter(self,env)
+
+
+class EMatch (Exp):
+    def __init__ (self, exp, patterns, results, default=None):
+        self._exp = exp
+        self._patterns = patterns
+        self._results = results
+        self._default = default
+        self.expForm = "EMatch"
+        self.is_basic = False
+
+    def typecheck (self, symtable):
+        # Make sure all results are of the same type (otherwise type of EMatch can't be determined)
+        if len(results) > 0:
+            firstType = results[0].typecheck(symtable)
+            typesAllSame = all([firstType.isEqual(r.typecheck(symtable)) for r in results])
+
+            if typesAllSame:
+                return firstType
+
+        raise Exception("Type error: types of EMatch results must all be the same.")
+
+    def __str__ (self):
+        prettyPatterns = [str(p) for p in self._patterns]
+        return "EMatch({}, [{}])".format(self._exp, prettyPatterns)
+
+    def eval (self, env):
+        for i,pattern in enumerate(self._patterns):
+            if pattern.matches(self._exp, env):
+                return self._results[i]
+
+        if self._default:
+            return self._default
+
+        raise Exception("Runtime error: no match for expression {}".format(self._exp))
 
 
 class EFunction (Exp):
@@ -789,6 +827,71 @@ class TUnknown (Type):
         return False
 
 
+
+############################################################
+# patterns
+class Pattern (object):
+    def matches (self, exp, env):
+        return False
+
+class PLessThan (Pattern):
+    def __init__ (self, exp):
+        self._exp = exp
+
+    def __str__ (self):
+        return "PLessThan({})".format(self._exp)
+
+    def matches (self, expToTest, env):
+        vToTest = expToTest.eval(env)
+        v = self._exp.eval(env)
+        return vToTest.value < v.value
+
+class PGreaterThan (Pattern):
+    def __init__ (self, exp):
+        self._exp = exp
+
+    def __str__ (self):
+        return "PGreaterThan({})".format(self._exp)
+
+    def matches (self, expToTest, env):
+        vToTest = expToTest.eval(env)
+        v = self._exp.eval(env)
+        return vToTest.value > v.value
+
+class PEqual (Pattern):
+    def __init__ (self, exp):
+        self._exp = exp
+
+    def __str__ (self):
+        return "PEqual({})".format(self._exp)
+
+    def matches (self, expToTest, env):
+        vToTest = expToTest.eval(env)
+        v = self._exp.eval(env)
+        return vToTest.value == v.value
+
+class PArrayUnpack (Pattern):
+    def __init__ (self, headName, tailName):
+        self._headName = headName
+        self._tailName = tailName
+
+    def __str__ (self):
+        return "PArrayUnpack({},{})".format(self._headName, self._tailName)
+
+    def matches (self, expToTest, env):
+        vToTest = expToTest.eval(env)
+        return vToTest.type.isEqual(TArray()) and len(vToTest.elts) > 0
+
+class PArrayMatch (Pattern):
+    def __init__ (self, names):
+        self._names = names
+
+    def __str__ (self):
+        return "PArrayMatch({})".format(self._names)
+
+    def matches (self, expToTest, env):
+        vToTest = expToTest.eval(env)
+        return vToTest.type.isEqual(TArray()) and len(vToTest.elts) == len(self._names)
 
 if __name__ == "__main__":
     shell()
