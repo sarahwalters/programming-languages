@@ -83,7 +83,8 @@ def eval_iter (exp,env):
                     return v
 
         elif current_exp.expForm == "EMatch":
-            print "this is still TODO"
+            print current_exp
+            print "top-level eval is still TODO"
 
         elif current_exp.expForm == "EFunction":
 
@@ -894,4 +895,18 @@ class PArrayMatch (Pattern):
         return vToTest.type.isEqual(TArray()) and len(vToTest.elts) == len(self._names)
 
 if __name__ == "__main__":
-    shell()
+    env = initial_env()
+    symt = initial_symtable()
+
+    test = EValue(VInteger(3))
+    print test.eval(env).value
+
+    print PLessThan(EValue(VInteger(5))).matches(test, env)
+    print not PLessThan(EValue(VInteger(1))).matches(test, env)
+    print not PGreaterThan(EValue(VInteger(5))).matches(test, env)
+    print PGreaterThan(EValue(VInteger(1))).matches(test, env)
+    print PArrayMatch([]).matches(EArray([]), env)
+    print PArrayMatch(['a']).matches(EArray([test]), env)
+    print PArrayMatch(['a','b']).matches(EArray([test, test]), env)
+    print not PArrayUnpack('h', 't').matches(EArray([]), env)
+    print PArrayUnpack('h', 't').matches(EArray([test]), env)
