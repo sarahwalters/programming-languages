@@ -490,7 +490,35 @@ def parse (input):
     pWHILE = "(" + Keyword("while") + pEXPR + pEXPR + ")"
     pWHILE.setParseAction(lambda result: makeWhile(result[2],result[3]))
 
-    pEXPR << (pINTEGER | pBOOLEAN | pARRAY | pIDENTIFIER | pIF | pLET | pFUN | pFUNrec| pDO | pWHILE | pCALL)
+    pPATTERN_LESSTHAN = Keyword("<") + pEXPR("exp")
+    pPATTERN_LESSTHAN.setParseAction(lambda result:PLessThan(result["exp"]))
+
+    pPATTERN_GREATERTHAN = Keyword(">") + pEXPR("exp")
+    pPATTERN_GREATERTHAN.setParseAction(lambda result:PGreaterThan(result["exp"]))
+
+    pPATTERN_EQUAL = Keyword("=") + pEXPR("exp")
+    pPATTERN_EQUAL.setParseAction(lambda result: PEquals(result["exp"]))
+
+#   If we add back in InstanceOf pattern
+#   pPATTERN_INSTANCEOF = Keyword("is") + pEXPR("exp")
+#   pPATTERN_INSTANCEOF.setParseAction(lambda: result:PInstanceOf(result["exp"]))
+
+    pPATTERN_ARRAYUNPACK = pNAME("head") + Keyword("::") + pNAME("tail")
+    pPATTERN_ARRAYUNPACK.setParseAction(lambda result:PArrayUnpack(result["head"], result["tail"]))
+
+    pPATTERN_ARRAYMATCH = Keyword('[') + ZeroOrMore(pNAME)("names") + Keyword(']')
+    pPATTERN_ARRAYMATCH.setParseAction(lambda result:PArrayMatch(result['names']))
+
+    pPATTERN = Keyword("|") + (pPATTERN_LESSTHAN | pPATTERN_GREATERTHAN | pPATTERN_EQUAL | pPATTERN_ARRAYUNPACK | pPATTERN_ARRAYMATCH) + Keyword(":") + pEXPR("res")
+    pPATTERN.setParseAction(lambda result: (result[1], result["res"]))
+
+    pDEFAULT = Keyword("default") + ":" + pEXPR("default")
+    pDEFAULT.setParseAction(lambda result: result["default"])
+
+    pMATCH = "(" + Keyword("match") + pEXPR("exp") + Keyword("with") + OneOrMore(pPATTERN)("patterns") + ZeroOrMore(pDEFAULT) + ")"
+    pMATCH.setParseAction(lambda res: EMatch(res["exp"], res["patterns"], res["default"]))
+
+    pEXPR << (pINTEGER | pBOOLEAN | pARRAY | pIDENTIFIER | pMATCH | pIF | pLET | pFUN | pFUNrec| pDO | pWHILE | pCALL)
 
     # can't attach a parse action to pEXPR because of recursion, so let's duplicate the parser
     pTOPEXPR = pEXPR.copy()
