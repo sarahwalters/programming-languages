@@ -1,5 +1,5 @@
 ############################################################
-# FUNC 
+# FUNC
 # S-expressions surface syntax
 # reference cells
 #
@@ -83,7 +83,7 @@ def eval_iter (exp,env):
                     return v
 
         elif current_exp.expForm == "EFunction":
-            
+
             return VClosure(current_exp._params,current_exp._body,current_env,current_exp._name)
 
         else:
@@ -91,7 +91,7 @@ def eval_iter (exp,env):
             raise Exception("Unrecognized expression form: {}".format(current_exp.expForm))
 
 
-    
+
 class EValue (Exp):
     # Value literal
     def __init__ (self,v):
@@ -100,16 +100,16 @@ class EValue (Exp):
         self.is_basic = True
 
     def typecheck (self,symtable):
-        # type is the type of the literal 
+        # type is the type of the literal
         return self._value.type
-    
+
     def __str__ (self):
         return "EValue({})".format(self._value)
 
     def eval (self,env):
         return eval_iter(self,env)
 
-    
+
 class EPrimCall (Exp):
     # Call an underlying Python primitive, passing in Values
     #
@@ -172,7 +172,7 @@ class EIf (Exp):
         return eval_iter(self,env)
 
 
-    
+
 class EId (Exp):
     # identifier
 
@@ -193,6 +193,23 @@ class EId (Exp):
 
     def eval (self,env):
         return eval_iter(self,env)
+
+
+class EArray (Exp):
+    # creates a mutable array
+    def __init__ (self, elts):
+        self._elts = elts
+
+    def typecheck (self,symtable):
+        return TArray() # TODO could type elements in array.
+
+    def __str__ (self):
+        pretty_elts = [str(elt) for elt in self._elts]
+        return "EArray([{}])".format(pretty_elts)
+
+    def eval (self, env):
+        elts = [elt.eval(env) for elt in self._elts]
+        return VArray(elts)
 
 
 class ECall (Exp):
@@ -258,8 +275,8 @@ class EFunction (Exp):
         return eval_iter(self,env)
 
 
-              
-    
+
+
 #
 # Values
 #
@@ -270,7 +287,7 @@ class Value (object):
 
 class VInteger (Value):
     # Value representation of integers
-    
+
     def __init__ (self,i):
         self.value = i
         self.type = TInteger()
@@ -278,10 +295,10 @@ class VInteger (Value):
     def __str__ (self):
         return str(self.value)
 
-    
+
 class VBoolean (Value):
     # Value representation of Booleans
-    
+
     def __init__ (self,b):
         self.value = b
         self.type = TBoolean()
@@ -289,9 +306,19 @@ class VBoolean (Value):
     def __str__ (self):
         return "true" if self.value else "false"
 
-    
+
+class VArray (Value):
+
+    def __init__ (self, elts):
+        self.elts = elts
+        self.type = TArray()
+
+    def __str__ (self):
+        return "<arr [{}]>".format(",".join([str(elt) for elt in self.elts]))
+
+
 class VClosure (Value):
-    
+
     def __init__ (self,params,body,env,name=None):
         self._params = params
         self._body = body
@@ -303,7 +330,7 @@ class VClosure (Value):
         return "<function [{}] {}>".format(",".join(self._params),str(self._body))
 
 
-    
+
 class VRefCell (Value):
 
     def __init__ (self,initial):
@@ -327,7 +354,7 @@ class VNone (Value):
 
 # Primitive operations
 
-def oper_plus (v1,v2): 
+def oper_plus (v1,v2):
     return VInteger(v1.value + v2.value)
 
 def oper_minus (v1,v2):
@@ -348,7 +375,7 @@ def oper_deref (v1):
 def oper_update (v1,v2):
     v1.content = v2
     return VNone()
- 
+
 def oper_print (v1):
     print v1
     return VNone()
@@ -362,7 +389,7 @@ def oper_print (v1):
 ##
 # cf http://pyparsing.wikispaces.com/
 
-from pyparsing import Word, Literal, ZeroOrMore, OneOrMore, Keyword, Forward, alphas, alphanums, NoMatch, Group
+from pyparsing import Word, Literal, ZeroOrMore, OneOrMore, delimitedList, Optional, Keyword, Forward, alphas, alphanums, NoMatch, Group
 
 
 def parse (input):
@@ -412,6 +439,9 @@ def parse (input):
     pEXPRS = ZeroOrMore(pEXPR)
     pEXPRS.setParseAction(lambda result: [result])
 
+    pARRAY = "[" + Optional(delimitedList(pEXPR, delim=","))("array") + "]"
+    pARRAY.setParseAction(lambda result: EArray(result["array"] if "array" in result else []))
+
     pIF = "(" + Keyword("if") + pEXPR + pEXPR + pEXPR + ")"
     pIF.setParseAction(lambda result: EIf(result[2],result[3],result[4]))
 
@@ -460,7 +490,7 @@ def parse (input):
     pWHILE = "(" + Keyword("while") + pEXPR + pEXPR + ")"
     pWHILE.setParseAction(lambda result: makeWhile(result[2],result[3]))
 
-    pEXPR << (pINTEGER | pBOOLEAN | pIDENTIFIER | pIF | pLET | pFUN | pFUNrec| pDO | pWHILE | pCALL)
+    pEXPR << (pINTEGER | pBOOLEAN | pARRAY | pIDENTIFIER | pIF | pLET | pFUN | pFUNrec| pDO | pWHILE | pCALL)
 
     # can't attach a parse action to pEXPR because of recursion, so let's duplicate the parser
     pTOPEXPR = pEXPR.copy()
@@ -484,7 +514,7 @@ def parse (input):
 
     pQUIT = Keyword("#quit")
     pQUIT.setParseAction(lambda result: {"result":"quit"})
-    
+
     pTOP = (pDEFUN | pDEFINE | pQUIT | pABSTRACT | pTOPEXPR)
 
     result = pTOP.parseString(input)[0]
@@ -563,7 +593,7 @@ def shell ():
     print "#quit to quit, #abs to see abstract representation"
     env = initial_env()
     symt = initial_symtable()
-        
+
     while True:
         inp = raw_input("ref/types> ")
 
@@ -605,7 +635,7 @@ def shell ():
                 env = add_binding(result["name"],v,env)
                 symt = add_binding(result["name"],t,symt)
                 print "{} defined".format(result["name"])
-                
+
         except Exception as e:
             print "Exception: {}".format(e)
 
@@ -626,6 +656,8 @@ class Type (object):
     def isRef (self):
         return False
     def isNone (self):
+        return False
+    def isArray (self):
         return False
     def isAny (self):
         return False
@@ -651,6 +683,16 @@ class TBoolean (Type):
         return True
     def isEqual (self,t):
         return (t.isBoolean() or t.isAny())
+
+class TArray (Type):
+    def __init__ (self):
+        self.type = "array"
+    def __str__ (self):
+        return "array"
+    def isArray (self):
+        return True
+    def isEqual (self,t):
+        return (t.isArray() or t.isAny())
 
 class TNone (Type):
     def __init__ (self):
@@ -692,7 +734,7 @@ class TRef (Type):
 
 
 # This is a special type that represents "any" value
-# It is equal to any type, meaning that it will satisfy type checking 
+# It is equal to any type, meaning that it will satisfy type checking
 #  any place it occurs
 # It is used as the initial result type for a recursive function when
 #  type checking the body of the recursive function
@@ -706,7 +748,7 @@ class TAny (Type):
         return True
     def isEqual (self,t):
         return True
-    
+
 
 # useful as a placeholder -- this will always fail
 class TUnknown (Type):
@@ -719,3 +761,6 @@ class TUnknown (Type):
         return False
 
 
+
+if __name__ == "__main__":
+    shell()
