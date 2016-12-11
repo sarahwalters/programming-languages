@@ -77,7 +77,6 @@ def eval_iter (exp,env):
             return apply(current_exp._prim,vs)
 
         elif current_exp.expForm == "EId":
-
             for (id,v) in reversed(current_env):
                 if current_exp._id == id:
                     return v
@@ -209,7 +208,7 @@ class EArray (Exp):
 
     def __str__ (self):
         pretty_elts = [str(elt) for elt in self._elts]
-        return "EArray([{}])".format(pretty_elts)
+        return "EArray({})".format(pretty_elts)
 
     def eval (self, env):
         elts = [elt.eval(env) for elt in self._elts]
@@ -255,12 +254,15 @@ class EMatch (Exp):
         self.is_basic = False
 
     def typecheck (self, symtable):
-        if len(results) == 0:
+        if len(self._matches) == 0:
             raise Exception("Runtime error: EMatch with no patterns.")
 
         # Build a list of result types for the matches
         types = []
-        for (p, r) in self._matches:
+        for _,match in enumerate(self._matches):
+            p = match[0] # the pattern
+            r = match[1] # the result
+
             # if we're naming elements of an array, need to add new ids to env
             if p.patternType == "PArrayUnpack":
                 newTypes = [(p.headName, TAny()), (p.tailName, TArray())] # TODO be more specific
@@ -268,6 +270,8 @@ class EMatch (Exp):
             elif p.patternType == "PArrayMatch":
                 newTypes = [(n, TAny()) for n in p.names] # TODO be more specific
                 types.append(r.typecheck(symtable + newTypes))
+            else:
+                types.append(r.typecheck(symtable))
 
         # Make sure all results are of the same type (otherwise type of EMatch can't be determined)
         typesAllSame = all([types[0].isEqual(t) for t in types])
@@ -282,8 +286,22 @@ class EMatch (Exp):
 
     def eval (self, env):
         for _,match in enumerate(self._matches):
-            if match[0].matches(self._exp, env):
-                return match[1]
+            p = match[0] # the pattern
+            r = match[1] # the rest
+
+            if p.matches(self._exp, env):
+                # add to the environment if we're unpacking or matching an array
+                if p.patternType == "PArrayUnpack":
+                    v = self._exp.eval(env)
+                    newIds = [(p.headName, v.head()), (p.tailName, v.tail())]
+                    env = env + newIds
+                elif p.patternType == "PArrayMatch":
+                    v = self._exp.eval(env)
+                    newIds = zip(p.names, v.elts)
+                    env = env + newIds
+
+                # always eval the result
+                return r.eval(env)
 
         if self._default:
             return self._default
@@ -364,6 +382,12 @@ class VArray (Value):
 
     def __str__ (self):
         return "<arr [{}]>".format(",".join([str(elt) for elt in self.elts]))
+
+    def head(self):
+        return self.elts[0]
+
+    def tail(self):
+        return self.elts[1:]
 
 
 class VClosure (Value):
@@ -539,7 +563,35 @@ def parse (input):
     pWHILE = "(" + Keyword("while") + pEXPR + pEXPR + ")"
     pWHILE.setParseAction(lambda result: makeWhile(result[2],result[3]))
 
-    pEXPR << (pINTEGER | pBOOLEAN | pARRAY | pIDENTIFIER | pIF | pLET | pFUN | pFUNrec| pDO | pWHILE | pCALL)
+    pPATTERN_LESSTHAN = Keyword("<") + pEXPR("exp")
+    pPATTERN_LESSTHAN.setParseAction(lambda result:PLessThan(result["exp"]))
+
+    pPATTERN_GREATERTHAN = Keyword(">") + pEXPR("exp")
+    pPATTERN_GREATERTHAN.setParseAction(lambda result:PGreaterThan(result["exp"]))
+
+    pPATTERN_EQUAL = Keyword("=") + pEXPR("exp")
+    pPATTERN_EQUAL.setParseAction(lambda result: PEquals(result["exp"]))
+
+#   If we add back in InstanceOf pattern
+#   pPATTERN_INSTANCEOF = Keyword("is") + pEXPR("exp")
+#   pPATTERN_INSTANCEOF.setParseAction(lambda: result:PInstanceOf(result["exp"]))
+
+    pPATTERN_ARRAYUNPACK = pNAME("head") + Keyword("::") + pNAME("tail")
+    pPATTERN_ARRAYUNPACK.setParseAction(lambda result:PArrayUnpack(result["head"], result["tail"]))
+
+    pPATTERN_ARRAYMATCH = Keyword('[') + ZeroOrMore(pNAME)("names") + Keyword(']')
+    pPATTERN_ARRAYMATCH.setParseAction(lambda result:PArrayMatch(result['names'] if "names" in result else []))
+
+    pPATTERN = Keyword("|") + (pPATTERN_LESSTHAN | pPATTERN_GREATERTHAN | pPATTERN_EQUAL | pPATTERN_ARRAYUNPACK | pPATTERN_ARRAYMATCH) + Keyword(":") + pEXPR("res")
+    pPATTERN.setParseAction(lambda result: (result[1], result["res"]))
+
+    pDEFAULT = Keyword("default") + ":" + pEXPR("default")
+    pDEFAULT.setParseAction(lambda result: result["default"])
+
+    pMATCH = "(" + Keyword("match") + pEXPR("exp") + Keyword("with") + OneOrMore(pPATTERN)("patterns") + Optional(pDEFAULT)("default") + ")"
+    pMATCH.setParseAction(lambda res: EMatch(res["exp"], res["patterns"], res["default"][0] if "default" in res else None))
+
+    pEXPR << (pINTEGER | pBOOLEAN | pARRAY | pIDENTIFIER | pMATCH | pIF | pLET | pFUN | pFUNrec| pDO | pWHILE | pCALL)
 
     # can't attach a parse action to pEXPR because of recursion, so let's duplicate the parser
     pTOPEXPR = pEXPR.copy()
@@ -656,7 +708,7 @@ def shell ():
                     print "[Type {}]".format(typ)
                     v = exp.eval(env)
                     # print "Eval time: {}s".format(round(timer.time(),3))
-                print v
+                print "value {}".format(v)
 
             elif result["result"] == "abstract":
                 exp = result["expr"]
@@ -828,7 +880,7 @@ class PLessThan (Pattern):
     def matches (self, expToTest, env):
         vToTest = expToTest.eval(env)
         v = self._exp.eval(env)
-        return vToTest.value < v.value
+        return vToTest.type.isEqual(TInteger()) and vToTest.value < v.value
 
 class PGreaterThan (Pattern):
     def __init__ (self, exp):
@@ -841,20 +893,20 @@ class PGreaterThan (Pattern):
     def matches (self, expToTest, env):
         vToTest = expToTest.eval(env)
         v = self._exp.eval(env)
-        return vToTest.value > v.value
+        return vToTest.type.isEqual(TInteger()) and vToTest.value > v.value
 
-class PEqual (Pattern):
+class PEquals (Pattern):
     def __init__ (self, exp):
         self._exp = exp
-        self.patternType = "PEqual"
+        self.patternType = "PEquals"
 
     def __str__ (self):
-        return "PEqual({})".format(self._exp)
+        return "PEquals({})".format(self._exp)
 
     def matches (self, expToTest, env):
         vToTest = expToTest.eval(env)
         v = self._exp.eval(env)
-        return vToTest.value == v.value
+        return vToTest.type.isEqual(TInteger()) and vToTest.value == v.value
 
 class PArrayUnpack (Pattern):
     def __init__ (self, headName, tailName):
@@ -882,18 +934,20 @@ class PArrayMatch (Pattern):
         return vToTest.type.isEqual(TArray()) and len(vToTest.elts) == len(self.names)
 
 if __name__ == "__main__":
-    env = initial_env()
-    symt = initial_symtable()
+    # env = initial_env()
+    # symt = initial_symtable()
 
-    test = EValue(VInteger(3))
-    print test.eval(env).value
+    # test = EValue(VInteger(3))
+    # print test.eval(env).value
 
-    print PLessThan(EValue(VInteger(5))).matches(test, env)
-    print not PLessThan(EValue(VInteger(1))).matches(test, env)
-    print not PGreaterThan(EValue(VInteger(5))).matches(test, env)
-    print PGreaterThan(EValue(VInteger(1))).matches(test, env)
-    print PArrayMatch([]).matches(EArray([]), env)
-    print PArrayMatch(['a']).matches(EArray([test]), env)
-    print PArrayMatch(['a','b']).matches(EArray([test, test]), env)
-    print not PArrayUnpack('h', 't').matches(EArray([]), env)
-    print PArrayUnpack('h', 't').matches(EArray([test]), env)
+    # print PLessThan(EValue(VInteger(5))).matches(test, env)
+    # print not PLessThan(EValue(VInteger(1))).matches(test, env)
+    # print not PGreaterThan(EValue(VInteger(5))).matches(test, env)
+    # print PGreaterThan(EValue(VInteger(1))).matches(test, env)
+    # print PArrayMatch([]).matches(EArray([]), env)
+    # print PArrayMatch(['a']).matches(EArray([test]), env)
+    # print PArrayMatch(['a','b']).matches(EArray([test, test]), env)
+    # print not PArrayUnpack('h', 't').matches(EArray([]), env)
+    # print PArrayUnpack('h', 't').matches(EArray([test]), env)
+
+    shell()
