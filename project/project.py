@@ -247,33 +247,43 @@ class ECall (Exp):
 
 
 class EMatch (Exp):
-    def __init__ (self, exp, patterns, results, default=None):
+    def __init__ (self, exp, matches, default=None):
         self._exp = exp
-        self._patterns = patterns
-        self._results = results
+        self._matches = matches
         self._default = default
         self.expForm = "EMatch"
         self.is_basic = False
 
     def typecheck (self, symtable):
-        # Make sure all results are of the same type (otherwise type of EMatch can't be determined)
-        if len(results) > 0:
-            firstType = results[0].typecheck(symtable)
-            typesAllSame = all([firstType.isEqual(r.typecheck(symtable)) for r in results])
+        if len(results) == 0:
+            raise Exception("Runtime error: EMatch with no patterns.")
 
-            if typesAllSame:
-                return firstType
+        # Build a list of result types for the matches
+        types = []
+        for (p, r) in self._matches:
+            # if we're naming elements of an array, need to add new ids to env
+            if p.patternType == "PArrayUnpack":
+                newTypes = [(p.headName, TAny()), (p.tailName, TArray())] # TODO be more specific
+                types.append(r.typecheck(symtable + newTypes))
+            elif p.patternType == "PArrayMatch":
+                newTypes = [(n, TAny()) for n in p.names] # TODO be more specific
+                types.append(r.typecheck(symtable + newTypes))
+
+        # Make sure all results are of the same type (otherwise type of EMatch can't be determined)
+        typesAllSame = all([types[0].isEqual(t) for t in types])
+        if typesAllSame:
+            return types[0] # TODO make sure this isn't a TAny
 
         raise Exception("Type error: types of EMatch results must all be the same.")
 
     def __str__ (self):
-        prettyPatterns = [str(p) for p in self._patterns]
+        prettyPatterns = [str(m[0]) for m in self._matches]
         return "EMatch({}, [{}])".format(self._exp, prettyPatterns)
 
     def eval (self, env):
-        for i,pattern in enumerate(self._patterns):
-            if pattern.matches(self._exp, env):
-                return self._results[i]
+        for _,match in enumerate(self._matches):
+            if match[0].matches(self._exp, env):
+                return match[1]
 
         if self._default:
             return self._default
@@ -810,6 +820,7 @@ class Pattern (object):
 class PLessThan (Pattern):
     def __init__ (self, exp):
         self._exp = exp
+        self.patternType = "PLessThan"
 
     def __str__ (self):
         return "PLessThan({})".format(self._exp)
@@ -822,6 +833,7 @@ class PLessThan (Pattern):
 class PGreaterThan (Pattern):
     def __init__ (self, exp):
         self._exp = exp
+        self.patternType = "PGreaterThan"
 
     def __str__ (self):
         return "PGreaterThan({})".format(self._exp)
@@ -834,6 +846,7 @@ class PGreaterThan (Pattern):
 class PEqual (Pattern):
     def __init__ (self, exp):
         self._exp = exp
+        self.patternType = "PEqual"
 
     def __str__ (self):
         return "PEqual({})".format(self._exp)
@@ -845,11 +858,12 @@ class PEqual (Pattern):
 
 class PArrayUnpack (Pattern):
     def __init__ (self, headName, tailName):
-        self._headName = headName
-        self._tailName = tailName
+        self.headName = headName
+        self.tailName = tailName
+        self.patternType = "PArrayUnpack"
 
     def __str__ (self):
-        return "PArrayUnpack({},{})".format(self._headName, self._tailName)
+        return "PArrayUnpack({},{})".format(self.headName, self.tailName)
 
     def matches (self, expToTest, env):
         vToTest = expToTest.eval(env)
@@ -857,14 +871,15 @@ class PArrayUnpack (Pattern):
 
 class PArrayMatch (Pattern):
     def __init__ (self, names):
-        self._names = names
+        self.names = names
+        self.patternType = "PArrayMatch"
 
     def __str__ (self):
-        return "PArrayMatch({})".format(self._names)
+        return "PArrayMatch({})".format(self.names)
 
     def matches (self, expToTest, env):
         vToTest = expToTest.eval(env)
-        return vToTest.type.isEqual(TArray()) and len(vToTest.elts) == len(self._names)
+        return vToTest.type.isEqual(TArray()) and len(vToTest.elts) == len(self.names)
 
 if __name__ == "__main__":
     env = initial_env()
