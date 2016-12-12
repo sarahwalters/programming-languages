@@ -439,7 +439,7 @@ def oper_times (v1,v2):
     return VInteger(v1.value * v2.value)
 
 def oper_concat (h,t):
-    return VArray(t.elts.insert(0, h.elts))
+    return VArray(h.elts + t.elts)
 
 def oper_zero (v1):
     return VBoolean(v1.value==0)
@@ -683,6 +683,7 @@ def initial_symtable ():
             ("-",TFunction([TInteger(),TInteger()],TInteger())),
             ("*",TFunction([TInteger(),TInteger()],TInteger())),
             ("zero?",TFunction([TInteger()],TBoolean())),
+            ("concat",TFunction([TArray(), TArray()], TArray())),
             # these types are not great for ref and company
             # they restrict reference cells to contain integers only
             # we need a better type system
