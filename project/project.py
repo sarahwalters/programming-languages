@@ -52,7 +52,6 @@ def eval_iter (exp,env):
         # these are all the special forms which directly
         # return the result of evaluating an expression
         if current_exp.expForm == "ECall":
-
             f = eval_iter(current_exp._fun,current_env)
             args = [ eval_iter(e,current_env) for e in current_exp._args]
             new_env = f._env + zip(f._params,args)
@@ -60,19 +59,20 @@ def eval_iter (exp,env):
             current_env = new_env
 
         elif current_exp.expForm == "EIf":
-
             v = eval_iter(current_exp._cond,current_env)
             if v.value:
                 current_exp = current_exp._then
             else:
                 current_exp = current_exp._else
 
-        elif current_exp.expForm == "EValue":
+        elif current_exp.expForm == "EArray":
+            elts = [elt.eval(env) for elt in current_exp._elts]
+            return VArray(elts)
 
+        elif current_exp.expForm == "EValue":
             return current_exp._value
 
         elif current_exp.expForm == "EPrimCall":
-
             vs = [ eval_iter(e,current_env) for e in current_exp._exps ]
             return apply(current_exp._prim,vs)
 
@@ -82,11 +82,30 @@ def eval_iter (exp,env):
                     return v
 
         elif current_exp.expForm == "EMatch":
-            print current_exp
-            print "top-level eval is still TODO"
+            for _,match in enumerate(current_exp._matches):
+                p = match[0] # the pattern
+                r = match[1] # the rest
+
+                if p.matches(current_exp._exp, current_env):
+                    # add to the environment if we're unpacking or matching an array
+                    if p.patternType == "PArrayUnpack":
+                        v = current_exp._exp.eval(current_env)
+                        newIds = [(p.headName, v.head()), (p.tailName, v.tail())]
+                        current_env = current_env + newIds
+                    elif p.patternType == "PArrayMatch":
+                        v = current_exp._exp.eval(current_env)
+                        newIds = zip(p.names, v.elts)
+                        current_env = current_env + newIds
+
+                    # always eval the result
+                    return eval_iter(r, current_env)
+
+            if current_exp._default:
+                return current_exp._default.eval(current_env)
+
+            raise Exception("Runtime error: no match for expression {}".format(current_exp._exp))
 
         elif current_exp.expForm == "EFunction":
-
             return VClosure(current_exp._params,current_exp._body,current_env,current_exp._name)
 
         else:
@@ -202,6 +221,7 @@ class EArray (Exp):
     # creates a mutable array
     def __init__ (self, elts):
         self._elts = elts
+        self.expForm = "EArray"
 
     def typecheck (self,symtable):
         return TArray() # TODO could type elements in array.
@@ -211,8 +231,7 @@ class EArray (Exp):
         return "EArray({})".format(pretty_elts)
 
     def eval (self, env):
-        elts = [elt.eval(env) for elt in self._elts]
-        return VArray(elts)
+        return eval_iter(self,env)
 
 
 class ECall (Exp):
@@ -282,32 +301,10 @@ class EMatch (Exp):
 
     def __str__ (self):
         prettyPatterns = [str(m[0]) for m in self._matches]
-        return "EMatch({}, [{}])".format(self._exp, prettyPatterns)
+        return "EMatch({}, {})".format(self._exp, prettyPatterns)
 
     def eval (self, env):
-        for _,match in enumerate(self._matches):
-            p = match[0] # the pattern
-            r = match[1] # the rest
-
-            if p.matches(self._exp, env):
-                # add to the environment if we're unpacking or matching an array
-                if p.patternType == "PArrayUnpack":
-                    v = self._exp.eval(env)
-                    newIds = [(p.headName, v.head()), (p.tailName, v.tail())]
-                    env = env + newIds
-                elif p.patternType == "PArrayMatch":
-                    v = self._exp.eval(env)
-                    newIds = zip(p.names, v.elts)
-                    env = env + newIds
-
-                # always eval the result
-                return r.eval(env)
-
-        if self._default:
-            return self._default
-
-        raise Exception("Runtime error: no match for expression {}".format(self._exp))
-
+        return eval_iter(self, env)
 
 class EFunction (Exp):
     # Creates an anonymous function
@@ -387,7 +384,7 @@ class VArray (Value):
         return self.elts[0]
 
     def tail(self):
-        return self.elts[1:]
+        return VArray(self.elts[1:])
 
 
 class VClosure (Value):
@@ -489,19 +486,22 @@ def parse (input):
     pTYPE_BOOL = Keyword("bool")
     pTYPE_BOOL.setParseAction(lambda result: TBoolean())
 
+    pTYPE_ARR = Keyword("array")
+    pTYPE_ARR.setParseAction(lambda result: TArray())
+
     pTYPE_REF = "(" + Keyword("ref") + pTYPE + ")"
     pTYPE_REF.setParseAction(lambda result: TRef(result[2]))
 
     pTYPE_FUN = "(" + Literal("->") + "(" + Group(OneOrMore(pTYPE)) + ")" + pTYPE + ")"
     pTYPE_FUN.setParseAction(lambda result: TFunction(result[3],result[5]))
 
-    pTYPE << (pTYPE_INT | pTYPE_BOOL | pTYPE_REF | pTYPE_FUN)
+    pTYPE << (pTYPE_INT | pTYPE_BOOL | pTYPE_ARR | pTYPE_REF | pTYPE_FUN)
 
 
     pTYPES = "(" + Group(OneOrMore(pTYPE)) + ")"
     pTYPES.setParseAction(lambda result: [result[1]])
 
-    pINTEGER = Word("0123456789")
+    pINTEGER = Word("-0123456789")
     pINTEGER.setParseAction(lambda result: EValue(VInteger(int(result[0]))))
 
     pBOOLEAN = Keyword("true") | Keyword("false")
@@ -585,7 +585,7 @@ def parse (input):
     pPATTERN = Keyword("|") + (pPATTERN_LESSTHAN | pPATTERN_GREATERTHAN | pPATTERN_EQUAL | pPATTERN_ARRAYUNPACK | pPATTERN_ARRAYMATCH) + Keyword(":") + pEXPR("res")
     pPATTERN.setParseAction(lambda result: (result[1], result["res"]))
 
-    pDEFAULT = Keyword("default") + ":" + pEXPR("default")
+    pDEFAULT = Keyword("|") + Keyword("default") + ":" + pEXPR("default")
     pDEFAULT.setParseAction(lambda result: result["default"])
 
     pMATCH = "(" + Keyword("match") + pEXPR("exp") + Keyword("with") + OneOrMore(pPATTERN)("patterns") + Optional(pDEFAULT)("default") + ")"
@@ -617,9 +617,10 @@ def parse (input):
     pQUIT.setParseAction(lambda result: {"result":"quit"})
 
     pTOP = (pDEFUN | pDEFINE | pQUIT | pABSTRACT | pTOPEXPR)
+    pTOPS = OneOrMore(pTOP)
 
-    result = pTOP.parseString(input)[0]
-    return result    # the first element of the result is the expression
+    result = pTOPS.parseString(input)
+    return result
 
 
 
@@ -686,61 +687,70 @@ def initial_symtable ():
             ("print!",TFunction([TInteger()],TNone()))]
 
 
-def shell ():
+def switch (result, env, symt):
+    try:
+        if result["result"] == "expression":
+            exp = result["expr"]
+            with Timer() as timer:
+                typ = exp.typecheck(symt)
+                v = exp.eval(env)
+                # print "Eval time: {}s".format(round(timer.time(),3))
+            print "{} [Type {}]".format(v, typ)
+
+        elif result["result"] == "abstract":
+            exp = result["expr"]
+            print exp
+
+        elif result["result"] == "quit":
+            return
+
+        elif result["result"] == "function":
+            # the top-level environment is special, it is shared
+            # amongst all the top-level closures so that all top-level
+            # functions can refer to each other
+            f = EFunction(result["params"],result["body"],types=result["types"],name=result["name"])
+            t = f.typecheck(symt)
+            print "[Type {}]".format(t)
+            v = f.eval(env)
+            env = add_binding(result["name"],v,env)
+            symt = add_binding(result["name"],t,symt)
+            print "{} defined".format(result["name"])
+
+        elif result["result"] == "value":
+            exp = result["expr"]
+            t = exp.typecheck(symt)
+            v = exp.eval(env)
+            env = add_binding(result["name"],v,env)
+            symt = add_binding(result["name"],t,symt)
+            print "{} defined".format(result["name"])
+
+    except Exception as e:
+        print "Exception: {}".format(e)
+
+    return (env, symt)
+
+def shell (env, symt):
     # A simple shell
     # Repeatedly read a line of input, parse it, and evaluate the result
 
     print "Lecture 10 - REF Language with static type checking"
     print "#quit to quit, #abs to see abstract representation"
-    env = initial_env()
-    symt = initial_symtable()
 
     while True:
-        inp = raw_input("ref/types> ")
+        inp = raw_input("ref/match> ")
+        result = parse(inp)[0]
+        (env, symt) = switch(result, env, symt)
 
-        try:
-            result = parse(inp)
+def run (filepath, env, symt):
+    # A simple program-runner
+    # Load the program at the filepath, parse it, and evaluate the result
 
-            if result["result"] == "expression":
-                exp = result["expr"]
-                with Timer() as timer:
-                    typ = exp.typecheck(symt)
-                    print "[Type {}]".format(typ)
-                    v = exp.eval(env)
-                    # print "Eval time: {}s".format(round(timer.time(),3))
-                print "value {}".format(v)
-
-            elif result["result"] == "abstract":
-                exp = result["expr"]
-                print exp
-
-            elif result["result"] == "quit":
-                return
-
-            elif result["result"] == "function":
-                # the top-level environment is special, it is shared
-                # amongst all the top-level closures so that all top-level
-                # functions can refer to each other
-                f = EFunction(result["params"],result["body"],types=result["types"],name=result["name"])
-                t = f.typecheck(symt)
-                print "[Type {}]".format(t)
-                v = f.eval(env)
-                env = add_binding(result["name"],v,env)
-                symt = add_binding(result["name"],t,symt)
-                print "{} defined".format(result["name"])
-
-            elif result["result"] == "value":
-                exp = result["expr"]
-                t = exp.typecheck(symt)
-                v = exp.eval(env)
-                env = add_binding(result["name"],v,env)
-                symt = add_binding(result["name"],t,symt)
-                print "{} defined".format(result["name"])
-
-        except Exception as e:
-            print "Exception: {}".format(e)
-
-
+    with open(filepath) as f:
+        # load the program
+        content = f.read()
+        results = parse(content)
+        for result in results:
+            (env, symt) = switch(result, env, symt)
 
 
 ############################################################
@@ -934,8 +944,8 @@ class PArrayMatch (Pattern):
         return vToTest.type.isEqual(TArray()) and len(vToTest.elts) == len(self.names)
 
 if __name__ == "__main__":
-    # env = initial_env()
-    # symt = initial_symtable()
+    env = initial_env()
+    symt = initial_symtable()
 
     # test = EValue(VInteger(3))
     # print test.eval(env).value
@@ -950,4 +960,8 @@ if __name__ == "__main__":
     # print not PArrayUnpack('h', 't').matches(EArray([]), env)
     # print PArrayUnpack('h', 't').matches(EArray([test]), env)
 
-    shell()
+    if len(sys.argv) > 1:
+        filepath = sys.argv[1]
+        run(filepath, env, symt)
+    else:
+        shell(env, symt)
