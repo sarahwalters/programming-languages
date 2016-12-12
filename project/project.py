@@ -1,11 +1,12 @@
 ############################################################
-# FUNC
-# S-expressions surface syntax
-# reference cells
+# HOMEWORK 7
 #
-# Type checking
+# Team members: Austin Greene, Sarah Walters
 #
-# use shell() to start
+# Emails: austin.greene@students.olin.edu, sarah.walters@students.olin.edu
+#
+# Remarks:
+#
 
 import sys
 import time
@@ -31,8 +32,6 @@ class Timer(object):
 
     def time (self):
         return time.time() - self.__start
-
-
 
 
 #
