@@ -433,6 +433,9 @@ def oper_minus (v1,v2):
 def oper_times (v1,v2):
     return VInteger(v1.value * v2.value)
 
+def oper_concat (h,t):
+    return VArray(t.elts.insert(0, h.elts))
+
 def oper_zero (v1):
     return VBoolean(v1.value==0)
 
@@ -449,10 +452,6 @@ def oper_update (v1,v2):
 def oper_print (v1):
     print v1
     return VNone()
-
-
-
-
 
 ##
 ## PARSER
@@ -648,6 +647,11 @@ def initial_env ():
     env = add_binding("zero?",
                       VClosure(["x"],
                                EPrimCall(oper_zero,[EId("x")]),
+                               []),
+                      env)
+    env = add_binding("concat",
+                      VClosure(["x","y"],
+                               EPrimCall(oper_concat,[EId("x"),EId("y")]),
                                []),
                       env)
     env = add_binding("ref",

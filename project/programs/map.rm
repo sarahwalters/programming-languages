@@ -1,0 +1,6 @@
+(defun map (f x) ((-> (int) int) array) (
+	match xs with
+	| [] : []
+	| h :: t : []
+
+(map [1,2,3], (function (x) (int) (* x 2)))
