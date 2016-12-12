@@ -1,11 +1,12 @@
 ############################################################
-# FUNC
-# S-expressions surface syntax
-# reference cells
+# HOMEWORK 7
 #
-# Type checking
+# Team members: Austin Greene, Sarah Walters
 #
-# use shell() to start
+# Emails: austin.greene@students.olin.edu, sarah.walters@students.olin.edu
+#
+# Remarks:
+#
 
 import sys
 import time
@@ -31,8 +32,6 @@ class Timer(object):
 
     def time (self):
         return time.time() - self.__start
-
-
 
 
 #
@@ -224,7 +223,7 @@ class EArray (Exp):
         self.expForm = "EArray"
 
     def typecheck (self,symtable):
-        return TArray() # TODO could type elements in array.
+        return TArray() # TRADEOFF could type elements in array.
 
     def __str__ (self):
         pretty_elts = [str(elt) for elt in self._elts]
@@ -284,10 +283,10 @@ class EMatch (Exp):
 
             # if we're naming elements of an array, need to add new ids to env
             if p.patternType == "PArrayUnpack":
-                newTypes = [(p.headName, TAny()), (p.tailName, TArray())] # TODO be more specific
+                newTypes = [(p.headName, TAny()), (p.tailName, TArray())] # TRADEOFF be more specific?
                 types.append(r.typecheck(symtable + newTypes))
             elif p.patternType == "PArrayMatch":
-                newTypes = [(n, TAny()) for n in p.names] # TODO be more specific
+                newTypes = [(n, TAny()) for n in p.names] # TRADEOFF be more specific?
                 types.append(r.typecheck(symtable + newTypes))
             else:
                 types.append(r.typecheck(symtable))
@@ -295,7 +294,13 @@ class EMatch (Exp):
         # Make sure all results are of the same type (otherwise type of EMatch can't be determined)
         typesAllSame = all([types[0].isEqual(t) for t in types])
         if typesAllSame:
-            return types[0] # TODO make sure this isn't a TAny
+            # Try to find a type which isn't a TAny (for as much specificity as possible)
+            for typ in types:
+                if not typ.isAny():
+                    return typ
+
+            # Otherwise, return a TAny(0)
+            return TAny()
 
         raise Exception("Type error: types of EMatch results must all be the same.")
 
@@ -570,10 +575,6 @@ def parse (input):
 
     pPATTERN_EQUAL = Keyword("=") + pEXPR("exp")
     pPATTERN_EQUAL.setParseAction(lambda result: PEquals(result["exp"]))
-
-#   If we add back in InstanceOf pattern
-#   pPATTERN_INSTANCEOF = Keyword("is") + pEXPR("exp")
-#   pPATTERN_INSTANCEOF.setParseAction(lambda: result:PInstanceOf(result["exp"]))
 
     pPATTERN_ARRAYUNPACK = pNAME("head") + Keyword("::") + pNAME("tail")
     pPATTERN_ARRAYUNPACK.setParseAction(lambda result:PArrayUnpack(result["head"], result["tail"]))

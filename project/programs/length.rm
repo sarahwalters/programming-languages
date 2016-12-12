@@ -1,0 +1,8 @@
+(defun length (xs) (array) (
+	match xs with
+	| [] : 0
+	| h :: t : (+ 1 (length t))
+))
+
+(length [1,2,3,4,5])
+(length [])
