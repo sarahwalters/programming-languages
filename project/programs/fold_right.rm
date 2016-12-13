@@ -1,0 +1,11 @@
+(defun fold_right (a xs base) ((-> (int int) int) array int) (
+	match xs with
+	| [] : base
+	| h :: t : (a h (fold_right a t base))
+))
+
+(fold_right (function (elt res) (int int) (+ elt res)) [1,2,3,4,5] 0)
+(fold_right (function (elt res) (int int) (+ elt res)) [] 0)
+
+(fold_right (function (elt res) (int int) (+ 1 res)) [1,2,3,4,5] 0)
+(fold_right (function (elt res) (int int) (+ 1 res)) [] 0)

@@ -1,0 +1,9 @@
+(defun positive (num) (int) (
+	match num with
+	| < 0 : false
+	| default : true
+))
+
+(positive 1)
+(positive 0)
+(positive -1)

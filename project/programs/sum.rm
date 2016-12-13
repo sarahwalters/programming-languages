@@ -1,0 +1,7 @@
+(defun sum (xs) (array) (
+	match xs with
+	| [] : 0
+	| h :: t : (+ h (sum t))
+))
+
+(sum [1,2,3,4,5])
