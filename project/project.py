@@ -81,8 +81,6 @@ def eval_iter (exp,env):
                     return v
 
         elif current_exp.expForm == "EMatch":
-            print current_exp._exp.eval(current_env).type
-
             for _,match in enumerate(current_exp._matches):
                 p = match[0] # the pattern
                 r = match[1] # the rest
@@ -501,7 +499,10 @@ def parse (input):
     pTYPE_FUN = "(" + Literal("->") + "(" + Group(OneOrMore(pTYPE)) + ")" + pTYPE + ")"
     pTYPE_FUN.setParseAction(lambda result: TFunction(result[3],result[5]))
 
-    pTYPE << (pTYPE_INT | pTYPE_BOOL | pTYPE_ARR | pTYPE_REF | pTYPE_FUN)
+    pTYPE_ANY = Keyword("any")
+    pTYPE_ANY.setParseAction(lambda result: TAny())
+
+    pTYPE << (pTYPE_INT | pTYPE_BOOL | pTYPE_ARR | pTYPE_ANY | pTYPE_REF | pTYPE_FUN)
 
 
     pTYPES = "(" + Group(OneOrMore(pTYPE)) + ")"
