@@ -81,6 +81,8 @@ def eval_iter (exp,env):
                     return v
 
         elif current_exp.expForm == "EMatch":
+            print current_exp._exp.eval(current_env).type
+
             for _,match in enumerate(current_exp._matches):
                 p = match[0] # the pattern
                 r = match[1] # the rest
@@ -567,22 +569,25 @@ def parse (input):
     pWHILE = "(" + Keyword("while") + pEXPR + pEXPR + ")"
     pWHILE.setParseAction(lambda result: makeWhile(result[2],result[3]))
 
+    pPATTERN_INSTANCEOF = Keyword("is") + pTYPE("type")
+    pPATTERN_INSTANCEOF.setParseAction(lambda result: PInstanceOf(result["type"]))
+
     pPATTERN_LESSTHAN = Keyword("<") + pEXPR("exp")
-    pPATTERN_LESSTHAN.setParseAction(lambda result:PLessThan(result["exp"]))
+    pPATTERN_LESSTHAN.setParseAction(lambda result: PLessThan(result["exp"]))
 
     pPATTERN_GREATERTHAN = Keyword(">") + pEXPR("exp")
-    pPATTERN_GREATERTHAN.setParseAction(lambda result:PGreaterThan(result["exp"]))
+    pPATTERN_GREATERTHAN.setParseAction(lambda result: PGreaterThan(result["exp"]))
 
     pPATTERN_EQUAL = Keyword("=") + pEXPR("exp")
     pPATTERN_EQUAL.setParseAction(lambda result: PEquals(result["exp"]))
 
     pPATTERN_ARRAYUNPACK = pNAME("head") + Keyword("::") + pNAME("tail")
-    pPATTERN_ARRAYUNPACK.setParseAction(lambda result:PArrayUnpack(result["head"], result["tail"]))
+    pPATTERN_ARRAYUNPACK.setParseAction(lambda result: PArrayUnpack(result["head"], result["tail"]))
 
     pPATTERN_ARRAYMATCH = Keyword('[') + ZeroOrMore(pNAME)("names") + Keyword(']')
-    pPATTERN_ARRAYMATCH.setParseAction(lambda result:PArrayMatch(result['names'] if "names" in result else []))
+    pPATTERN_ARRAYMATCH.setParseAction(lambda result: PArrayMatch(result['names'] if "names" in result else []))
 
-    pPATTERN = Keyword("|") + (pPATTERN_LESSTHAN | pPATTERN_GREATERTHAN | pPATTERN_EQUAL | pPATTERN_ARRAYUNPACK | pPATTERN_ARRAYMATCH) + Keyword(":") + pEXPR("res")
+    pPATTERN = Keyword("|") + (pPATTERN_INSTANCEOF | pPATTERN_LESSTHAN | pPATTERN_GREATERTHAN | pPATTERN_EQUAL | pPATTERN_ARRAYUNPACK | pPATTERN_ARRAYMATCH) + Keyword(":") + pEXPR("res")
     pPATTERN.setParseAction(lambda result: (result[1], result["res"]))
 
     pDEFAULT = Keyword("|") + Keyword("default") + ":" + pEXPR("default")
@@ -885,6 +890,18 @@ class Pattern (object):
     def matches (self, exp, env):
         return False
 
+class PInstanceOf (Pattern):
+    def __init__ (self, typ):
+        self._typ = typ
+        self.patternType = "PInstanceOf"
+
+    def __str__ (self):
+        return "PInstanceOf({})".format(self._typ)
+
+    def matches (self, expToTest, env):
+        vToTest = expToTest.eval(env)
+        return vToTest.type.isEqual(self._typ)
+
 class PLessThan (Pattern):
     def __init__ (self, exp):
         self._exp = exp
@@ -952,19 +969,6 @@ class PArrayMatch (Pattern):
 if __name__ == "__main__":
     env = initial_env()
     symt = initial_symtable()
-
-    # test = EValue(VInteger(3))
-    # print test.eval(env).value
-
-    # print PLessThan(EValue(VInteger(5))).matches(test, env)
-    # print not PLessThan(EValue(VInteger(1))).matches(test, env)
-    # print not PGreaterThan(EValue(VInteger(5))).matches(test, env)
-    # print PGreaterThan(EValue(VInteger(1))).matches(test, env)
-    # print PArrayMatch([]).matches(EArray([]), env)
-    # print PArrayMatch(['a']).matches(EArray([test]), env)
-    # print PArrayMatch(['a','b']).matches(EArray([test, test]), env)
-    # print not PArrayUnpack('h', 't').matches(EArray([]), env)
-    # print PArrayUnpack('h', 't').matches(EArray([test]), env)
 
     if len(sys.argv) > 1:
         filepath = sys.argv[1]
