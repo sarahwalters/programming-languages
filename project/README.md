@@ -3,7 +3,7 @@
 ## Problem
 We implemented functional-style match statements. Match statements are like switch statements: they compare an input to a list of cases and evaluate the result which corresponds to the first case the input matches. The match statement we implemented is more powerful than a switch statement in that it is able to "unpack" array inputs, either by defining variables for every element of an array of a certain length or by defining variables for the array's head (first element) and tail (array of the non-head elements). Because pattern-matching is often able to "unpack" array inputs like this, it's commonly used to implement recursion over arrays.
 
-Also, the OCaml docuemntation calls match statements a "Cool Feature"... so, we figured this would be a Cool Project.
+Also, the OCaml documentation calls match statements a "Cool Feature"... so, we figured this would be a Cool Project.
 
 ## Approach
 We added match statements to [one of Riccardo's sample languages](http://rpucella.net/courses/pl-fa16/code-lect-10-types.py) (the one with typechecking). We implemented a `pMATCH` nonterminal, an `EMatch` expression, and a group of `Pattern` classes. We also added simple arrays to the language so we could pattern-match on arrays -- but that's nothing new.
