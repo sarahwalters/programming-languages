@@ -57,6 +57,18 @@ class TestStringMethods (unittest.TestCase):
                                        ("b",EId("a"))],
                                        EPrimCall("-",[EId("a"),EId("b")]))).expand().eval(INITIAL_PRIM_DICT).value, 0)
 
+    def test_ELetN(self):
+        self.assertEqual(ELetN("a",EInteger(10),EId("a")).eval(INITIAL_PRIM_DICT).value, 10)
+        self.assertEqual(ELetN("a",EInteger(10),
+                         ELetN("b",EInteger(20),EId("a"))).eval(INITIAL_PRIM_DICT).value, 10)
+        self.assertEqual(ELetN("a",EInteger(10),
+                         ELetN("a",EInteger(20),EId("a"))).eval(INITIAL_PRIM_DICT).value, 20)
+        self.assertEqual(ELetN("a",EPrimCall("+",[EInteger(10),EInteger(20)]),
+                         ELetN("b",EInteger(20),EId("a"))).eval(INITIAL_PRIM_DICT).value, 30)
+        self.assertEqual(ELetN("a",EPrimCall("+",[EInteger(10),EInteger(20)]),
+                         ELetN("b",EInteger(20),
+                               EPrimCall("*",[EId("a"),EId("a")]))).eval(INITIAL_PRIM_DICT).value, 900)
+
     def test_EDef(self):
         EDef("add1", ["x"], EPrimCall("+", [EInteger(1), EId("x")])).eval(INITIAL_PRIM_DICT)
         EDef("add2", "x", EPrimCall("+", [EInteger(2), EId("x")])).eval(INITIAL_PRIM_DICT)
